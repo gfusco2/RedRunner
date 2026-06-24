@@ -1,0 +1,36 @@
+{
+  "name": "personal-running-log",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "postinstall": "prisma generate",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^3.6.0",
+    "@supabase/supabase-js": "^1.28.0",
+    "next": "latest",
+    "prisma": "^3.6.0",
+    "react": "latest",
+    "react-dom": "latest",
+    "tailwindcss": "^2.2.19"
+  },
+  "devDependencies": {
+    "@types/node": "26.0.0",
+    "@types/react": "19.2.17",
+    "eslint": "^7.32.0",
+    "eslint-config-next": "^12.0.7",
+    "typescript": "^4.5.4"
+  },
+  "description": "This is a personal running log application built with Next.js, Tailwind CSS, Prisma ORM, and Supabase (PostgreSQL). It allows users to log their runs, track distances, and manage their running shoes.",
+  "main": "next.config.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
