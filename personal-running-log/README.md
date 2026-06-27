@@ -1,57 +1,35 @@
 # Personal Running Log (RedRunner)
 
-A personal running log built with Next.js (App Router), Tailwind CSS, Prisma ORM, and Supabase PostgreSQL.
+A personal training log built with Next.js (App Router), Tailwind CSS, and Prisma ORM, backed by a Supabase-hosted PostgreSQL database.
+
+Data access is **Prisma-only**: the app connects directly to Postgres via `DATABASE_URL`. There is no `supabase-js` client. (If you later need Supabase Auth, Storage, or Realtime, add `@supabase/supabase-js` and the corresponding keys then.)
 
 ## Environment variables
 
-Create a `.env` file in the project root. Prisma talks to Postgres directly; the Supabase JS keys are for future client-side features (auth, storage, etc.).
+The app needs exactly **one** environment variable: `DATABASE_URL`. Copy the template and fill in your connection string:
 
-### 1. `DATABASE_URL` (required for Prisma)
+```bash
+cp .env.example .env
+```
 
-**Where:** Supabase Dashboard → **Project Settings** → **Database** → **Connection string**
+### `DATABASE_URL`
 
-1. Open your project in [Supabase](https://supabase.com/dashboard).
-2. Go to **Project Settings** (gear icon) → **Database**.
-3. Under **Connection string**, choose **URI**.
-4. Copy the connection string and replace `[YOUR-PASSWORD]` with your database password (the one you set when the project was created). Reset it on the same page if needed.
+**Where:** Supabase Dashboard → **Connect** button (top bar) → **Connection string**, or **Project Settings → Database → Connection string**.
 
-Use the **Direct connection** string (port `5432`) for local development and Prisma migrations:
+Use the **session-mode pooler** string (port `5432`) and replace `[YOUR-PASSWORD]` with your database password (Project Settings → Database → Database password; reset there if needed):
 
 ```env
 DATABASE_URL="postgresql://postgres.[PROJECT-REF]:[YOUR-PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
 ```
 
-Or the classic host format:
+> **Prisma version note:** This project runs Prisma 3.x, which does **not** support the
+> `directUrl` datasource field. So we use a **single** `DATABASE_URL` on the session-mode
+> pooler (port `5432`) rather than the transaction-pooler + `directUrl` split that Supabase
+> suggests for Prisma 4.10+. Session mode works for both `prisma db push` and runtime queries.
+> If you upgrade Prisma to 4.10+, you can switch to the two-URL setup (transaction pooler on
+> `6543` with `?pgbouncer=true` for `DATABASE_URL`, plus `DIRECT_URL` on `5432`).
 
-```env
-DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres"
-```
-
-### 2. `SUPABASE_URL` (required for Supabase client)
-
-**Where:** Supabase Dashboard → **Project Settings** → **API** → **Project URL**
-
-```env
-SUPABASE_URL="https://[PROJECT-REF].supabase.co"
-```
-
-### 3. `SUPABASE_ANON_KEY` (required for Supabase client)
-
-**Where:** Supabase Dashboard → **Project Settings** → **API** → **Project API keys** → **anon** / **public**
-
-```env
-SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-```
-
-### Example `.env`
-
-```env
-DATABASE_URL="postgresql://postgres:your-password@db.your-project-ref.supabase.co:5432/postgres"
-SUPABASE_URL="https://your-project-ref.supabase.co"
-SUPABASE_ANON_KEY="your-anon-key"
-```
-
-Do not commit `.env` to git.
+Do not commit `.env` to git (it is already gitignored). `.env.example` is safe to commit.
 
 ## Setup
 
@@ -68,43 +46,26 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### Prisma models
 
-- **Run** — `id`, `date`, `distance_miles`, `duration_seconds`, `notes`, optional `shoeId`
+- **Activity** — `id`, `date`, `type` (`RUN` | `BIKE` | `XTRAIN`), `distance_miles`, `duration_seconds`, `notes`, optional `shoeId`
 - **Shoe** — `id`, `brand`, `model`, `total_miles`, `active`
-- A run can optionally reference one shoe; deleting a shoe clears the link (`onDelete: SetNull`).
 
 ### Server Actions
 
-Defined in `src/app/actions/runs.ts`:
+Defined in `src/app/actions/activities.ts`:
 
-| Action       | Purpose |
-|--------------|---------|
-| `createRun`  | Insert a run; optionally links a shoe and increments that shoe's `total_miles` |
-| `getRuns`    | Fetch all runs, newest first, with shoe details included |
+| Action | Purpose |
+|--------|---------|
+| `createActivity` | Log a run, bike, or x-train session |
+| `deleteActivity` | Remove an activity |
+| `getActivitiesForWeek` | Fetch activities for a Monday-start week |
+| `getCurrentWeekActivities` | Fetch activities for the current week |
 
-**Example — fetch runs in a Server Component:**
+### Pages
 
-```tsx
-import { getRuns } from "app/actions/runs";
-
-export default async function RunsPage() {
-  const runs = await getRuns();
-  // ...
-}
-```
-
-**Example — create a run:**
-
-```tsx
-import { createRun } from "app/actions/runs";
-
-await createRun({
-  date: "2026-06-23T07:30:00.000Z",
-  distance_miles: 5.2,
-  duration_seconds: 2580,
-  notes: "Easy morning jog",
-  shoeId: 1, // optional
-});
-```
+| Route | Purpose |
+|-------|---------|
+| `/dashboard` | Current week summary and totals |
+| `/training-log` | Monday-start calendar; click a day to add activities |
 
 ## Scripts
 
