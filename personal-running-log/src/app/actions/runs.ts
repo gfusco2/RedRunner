@@ -1,8 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import prisma from "lib/prisma";
+import { createActivity, getActivitiesForWeek } from "./activities";
 
+/** @deprecated Use createActivity from activities.ts */
 export type CreateRunInput = {
   date: string;
   distance_miles: number;
@@ -11,49 +11,21 @@ export type CreateRunInput = {
   shoeId?: number | null;
 };
 
+/** @deprecated Use createActivity from activities.ts */
 export async function createRun(input: CreateRunInput) {
-  const date = new Date(input.date);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error("Invalid run date.");
-  }
-
-  if (input.distance_miles <= 0) {
-    throw new Error("Distance must be greater than zero.");
-  }
-
-  if (input.duration_seconds <= 0) {
-    throw new Error("Duration must be greater than zero.");
-  }
-
-  const run = await prisma.$transaction(async (tx) => {
-    const created = await tx.run.create({
-      data: {
-        date,
-        distance_miles: input.distance_miles,
-        duration_seconds: input.duration_seconds,
-        notes: input.notes?.trim() || null,
-        shoeId: input.shoeId ?? null,
-      },
-      include: { shoe: true },
-    });
-
-    if (input.shoeId) {
-      await tx.shoe.update({
-        where: { id: input.shoeId },
-        data: { total_miles: { increment: input.distance_miles } },
-      });
-    }
-
-    return created;
+  return createActivity({
+    date: input.date,
+    type: "RUN",
+    distance_miles: input.distance_miles,
+    duration_minutes: input.duration_seconds / 60,
+    notes: input.notes,
+    shoeId: input.shoeId,
   });
-
-  revalidatePath("/");
-  return run;
 }
 
+/** @deprecated Use getActivitiesForWeek from activities.ts */
 export async function getRuns() {
-  return prisma.run.findMany({
-    include: { shoe: true },
-    orderBy: { date: "desc" },
-  });
+  const { getMonday, toDateKey } = await import("lib/training/dates");
+  const activities = await getActivitiesForWeek(toDateKey(getMonday(new Date())));
+  return activities.filter((a) => a.type === "RUN");
 }

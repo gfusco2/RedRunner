@@ -7,24 +7,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Run {
-  id               Int      @id @default(autoincrement())
+enum ActivityType {
+  RUN
+  BIKE
+  XTRAIN
+}
+
+model Activity {
+  id               Int          @id @default(autoincrement())
   date             DateTime
-  distance_miles   Float
-  duration_seconds Int
+  type             ActivityType
+  distance_miles   Float?
+  duration_seconds Int?
   notes            String?
   shoeId           Int?
-  shoe             Shoe?    @relation(fields: [shoeId], references: [id], onDelete: SetNull)
+  shoe             Shoe?        @relation(fields: [shoeId], references: [id], onDelete: SetNull)
 
   @@index([date])
+  @@index([type])
   @@index([shoeId])
 }
 
 model Shoe {
-  id          Int     @id @default(autoincrement())
+  id          Int        @id @default(autoincrement())
   brand       String
   model       String
-  total_miles Float   @default(0)
-  active      Boolean @default(true)
-  runs        Run[]
+  total_miles Float      @default(0)
+  active      Boolean    @default(true)
+  activities  Activity[]
 }

@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@prisma/client": "^3.6.0",
-    "@supabase/supabase-js": "^1.28.0",
     "next": "latest",
     "prisma": "^3.6.0",
     "react": "latest",
@@ -27,10 +26,9 @@
     "eslint-config-next": "^12.0.7",
     "typescript": "^4.5.4"
   },
-  "description": "This is a personal running log application built with Next.js, Tailwind CSS, Prisma ORM, and Supabase (PostgreSQL). It allows users to log their runs, track distances, and manage their running shoes.",
+  "description": "A personal training log built with Next.js (App Router), Tailwind CSS, and Prisma ORM. Data access is Prisma-only against a Supabase-hosted PostgreSQL database. Track runs, bike sessions, and cross-training.",
   "main": "next.config.js",
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "type": "commonjs"
+  "license": "ISC"
 }
