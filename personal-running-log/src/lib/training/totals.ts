@@ -1,6 +1,12 @@
 import type { Activity, ActivityType } from "@prisma/client";
 import { toDateKey } from "./dates";
 
+/** Minimal fields needed for day/week mileage totals. */
+export type ActivityForTotals = Pick<
+  Activity,
+  "type" | "planned" | "distance_miles" | "duration_seconds" | "date"
+>;
+
 export type DayTotals = {
   /** Completed run mileage */
   runMiles: number;
@@ -21,7 +27,10 @@ export const emptyDayTotals = (): DayTotals => ({
   plannedXtrainSeconds: 0,
 });
 
-export function addToTotals(totals: DayTotals, activity: Activity): DayTotals {
+export function addToTotals(
+  totals: DayTotals,
+  activity: ActivityForTotals
+): DayTotals {
   const next = { ...totals };
   const planned = activity.planned;
 
@@ -54,10 +63,10 @@ export function sumTotals(days: DayTotals[]): DayTotals {
   );
 }
 
-export function groupActivitiesByDate(
-  activities: Activity[]
-): Record<string, Activity[]> {
-  return activities.reduce<Record<string, Activity[]>>((acc, activity) => {
+export function groupActivitiesByDate<T extends ActivityForTotals>(
+  activities: T[]
+): Record<string, T[]> {
+  return activities.reduce<Record<string, T[]>>((acc, activity) => {
     const key = toDateKey(new Date(activity.date));
     acc[key] = acc[key] ?? [];
     acc[key].push(activity);
@@ -65,7 +74,9 @@ export function groupActivitiesByDate(
   }, {});
 }
 
-export function totalsForActivities(activities: Activity[]): DayTotals {
+export function totalsForActivities(
+  activities: ActivityForTotals[]
+): DayTotals {
   return activities.reduce(addToTotals, emptyDayTotals());
 }
 
@@ -88,7 +99,7 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
 
 export function buildWeekCalendarData(
   weekDayDates: Date[],
-  activities: Activity[],
+  activities: ActivityForTotals[],
   today: Date
 ) {
   const weekDays = weekDayDates.map(toDateKey);

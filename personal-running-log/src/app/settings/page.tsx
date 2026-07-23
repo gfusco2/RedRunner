@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { getCurrentProfile, signOut } from "app/actions/auth";
+import { listMyAthletes, listMyCoaches } from "app/actions/coaching";
 import UnitPreferenceForm from "components/settings/UnitPreferenceForm";
 import ProfileForm from "components/settings/ProfileForm";
+import CoachAthletesForm from "components/settings/CoachAthletesForm";
 
 export default async function SettingsPage() {
   const profile = await getCurrentProfile();
+  const [athletes, coaches] = profile
+    ? await Promise.all([listMyAthletes(), listMyCoaches()])
+    : [[], []];
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
@@ -13,7 +18,7 @@ export default async function SettingsPage() {
           Settings
         </h1>
         <p className="mt-1 text-sm text-ink-500">
-          Units, profile, and account access.
+          Units, profile, coaching links, and account access.
         </p>
       </div>
 
@@ -26,6 +31,27 @@ export default async function SettingsPage() {
             email={profile.email}
             role={profile.role}
           />
+
+          <CoachAthletesForm athletes={athletes} />
+
+          {coaches.length > 0 && (
+            <div className="rounded-xl border border-ink-100 bg-white p-5 shadow-soft">
+              <h2 className="text-lg font-semibold text-ink-900">Your coaches</h2>
+              <ul className="mt-3 space-y-1 text-sm text-ink-700">
+                {coaches.map((c) => (
+                  <li key={c.id}>{c.name?.trim() || c.email}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <p className="text-sm text-ink-500">
+            <Link href="/reports" className="text-brand-600 underline">
+              Open reports
+            </Link>{" "}
+            to export CSV or print a training block.
+          </p>
+
           <form action={signOut}>
             <button type="submit" className="btn-ghost">
               Sign out
