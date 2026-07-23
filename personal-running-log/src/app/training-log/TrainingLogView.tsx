@@ -2,79 +2,104 @@
 
 import Link from "next/link";
 import type { Activity } from "@prisma/client";
-import WeekCalendar from "components/training/WeekCalendar";
+import MonthCalendar, {
+  type CalendarWeek,
+} from "components/training/MonthCalendar";
 import {
   addWeeks,
-  formatWeekLabel,
+  formatRangeLabel,
+  getFourWeekStarts,
+  getWeekDays,
   parseDateKey,
   toDateKey,
   getMonday,
+  getMultiWeekRange,
 } from "lib/training/dates";
-import { buildWeekCalendarData } from "lib/training/totals";
+import {
+  buildWeekCalendarData,
+  sumTotals,
+  totalsForActivities,
+  groupActivitiesByDate,
+} from "lib/training/totals";
 
 type TrainingLogViewProps = {
   weekStartKey: string;
-  weekDayDates: string[];
   activities: Activity[];
 };
 
 export default function TrainingLogView({
   weekStartKey,
-  weekDayDates,
   activities,
 }: TrainingLogViewProps) {
   const weekStart = parseDateKey(weekStartKey);
   const prevWeekKey = toDateKey(addWeeks(weekStart, -1));
   const nextWeekKey = toDateKey(addWeeks(weekStart, 1));
   const currentWeekKey = toDateKey(getMonday(new Date()));
+  const todayKey = toDateKey(new Date());
 
-  const dates = weekDayDates.map((k) => parseDateKey(k));
-  const { weekDays, weekTotals, todayKey } = buildWeekCalendarData(
-    dates,
-    activities,
-    new Date()
+  const weekStarts = getFourWeekStarts(weekStart);
+  const { end } = getMultiWeekRange(weekStart, 4);
+
+  const weeks: CalendarWeek[] = weekStarts.map((ws, index) => {
+    const days = getWeekDays(ws);
+    const { weekDays, weekTotals } = buildWeekCalendarData(
+      days,
+      activities,
+      new Date()
+    );
+    return {
+      weekStartKey: toDateKey(ws),
+      weekDays,
+      weekTotals,
+      emphasized: index === 0,
+    };
+  });
+
+  const byDate = groupActivitiesByDate(activities);
+  const allDayKeys = weeks.flatMap((w) => w.weekDays);
+  const periodTotals = sumTotals(
+    allDayKeys.map((key) => totalsForActivities(byDate[key] ?? []))
   );
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Training Log</h1>
-          <p className="text-sm text-gray-600">{formatWeekLabel(weekStart)}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink-900">
+            Training Log
+          </h1>
+          <p className="mt-1 text-sm text-ink-500">
+            {formatRangeLabel(weekStart, end)} · 4 weeks · focus week enlarged
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            href={`/training-log?week=${prevWeekKey}`}
-            className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
-          >
+          <Link href={`/training-log?week=${prevWeekKey}`} className="btn-ghost">
             ← Prev
           </Link>
           {weekStartKey !== currentWeekKey && (
             <Link
               href={`/training-log?week=${currentWeekKey}`}
-              className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
+              className="btn-ghost"
             >
               This week
             </Link>
           )}
-          <Link
-            href={`/training-log?week=${nextWeekKey}`}
-            className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
-          >
+          <Link href={`/training-log?week=${nextWeekKey}`} className="btn-ghost">
             Next →
           </Link>
         </div>
       </div>
 
-      <p className="mb-4 text-sm text-gray-500">
-        Click a day to view or add activities. Week totals appear in the right column.
+      <p className="mb-5 text-sm text-ink-500">
+        Click a day to log or plan. Planned miles show in lighter red; completed
+        miles in solid red.
       </p>
 
-      <WeekCalendar
-        weekDays={weekDays}
+      <MonthCalendar
+        weeks={weeks}
         activities={activities}
-        weekTotals={weekTotals}
         todayKey={todayKey}
+        periodTotals={periodTotals}
       />
     </div>
   );

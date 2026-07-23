@@ -1,7 +1,49 @@
-/* This file contains global CSS styles, including Tailwind CSS imports and custom styles. */
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Custom styles can be added below */
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-ink-50 text-ink-900;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white;
+  }
+
+  .btn-primary:hover {
+    @apply bg-brand-700;
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+  }
+
+  .btn-ghost {
+    @apply rounded-md border border-ink-200 bg-white px-3 py-1.5 text-sm text-ink-700;
+  }
+
+  .btn-ghost:hover {
+    @apply border-ink-500 bg-ink-50;
+  }
+
+  .input-field {
+    @apply w-full rounded-md border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900;
+  }
+
+  .input-field:focus {
+    @apply border-brand-500 outline-none;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+  }
+
+  .label-field {
+    @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-500;
+  }
+}

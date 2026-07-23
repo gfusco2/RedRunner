@@ -29,6 +29,11 @@ export function getWeekDays(weekStart: Date): Date[] {
   });
 }
 
+/** Four Monday-start weeks beginning at weekStart (current + 3 ahead). */
+export function getFourWeekStarts(weekStart: Date): Date[] {
+  return Array.from({ length: 4 }, (_, i) => addWeeks(weekStart, i));
+}
+
 export function addWeeks(date: Date, weeks: number): Date {
   const d = new Date(date);
   d.setDate(d.getDate() + weeks * 7);
@@ -36,8 +41,26 @@ export function addWeeks(date: Date, weeks: number): Date {
 }
 
 export function getWeekRange(weekStart: Date): { start: Date; end: Date } {
-  const start = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
+  const start = new Date(
+    weekStart.getFullYear(),
+    weekStart.getMonth(),
+    weekStart.getDate()
+  );
   const end = new Date(start.getTime() + 7 * DAY_MS);
+  return { start, end };
+}
+
+/** Inclusive start through exclusive end covering N Monday-start weeks. */
+export function getMultiWeekRange(
+  weekStart: Date,
+  weekCount: number
+): { start: Date; end: Date } {
+  const start = new Date(
+    weekStart.getFullYear(),
+    weekStart.getMonth(),
+    weekStart.getDate()
+  );
+  const end = new Date(start.getTime() + weekCount * 7 * DAY_MS);
   return { start, end };
 }
 
@@ -55,6 +78,19 @@ export function formatWeekLabel(weekStart: Date): string {
   }
 
   return `${monthFmt.format(first)} ${dayFmt.format(first)} – ${monthFmt.format(last)} ${dayFmt.format(last)}, ${yearFmt.format(last)}`;
+}
+
+export function formatRangeLabel(start: Date, endExclusive: Date): string {
+  const last = new Date(endExclusive.getTime() - DAY_MS);
+  const monthFmt = new Intl.DateTimeFormat("en-US", { month: "short" });
+  const dayFmt = new Intl.DateTimeFormat("en-US", { day: "numeric" });
+  const yearFmt = new Intl.DateTimeFormat("en-US", { year: "numeric" });
+
+  if (start.getMonth() === last.getMonth() && start.getFullYear() === last.getFullYear()) {
+    return `${monthFmt.format(start)} ${dayFmt.format(start)} – ${dayFmt.format(last)}, ${yearFmt.format(last)}`;
+  }
+
+  return `${monthFmt.format(start)} ${dayFmt.format(start)} – ${monthFmt.format(last)} ${dayFmt.format(last)}, ${yearFmt.format(last)}`;
 }
 
 export const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;

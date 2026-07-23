@@ -17,6 +17,8 @@ model Activity {
   id               Int          @id @default(autoincrement())
   date             DateTime
   type             ActivityType
+  name             String?
+  planned          Boolean      @default(false)
   distance_miles   Float?
   duration_seconds Int?
   notes            String?
@@ -25,6 +27,7 @@ model Activity {
 
   @@index([date])
   @@index([type])
+  @@index([planned])
   @@index([shoeId])
 }
 

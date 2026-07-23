@@ -38,12 +38,12 @@ export default function WeekCalendar({
             {WEEKDAY_LABELS.map((label) => (
               <div
                 key={label}
-                className="px-2 py-1 text-center text-xs font-semibold uppercase tracking-wide text-gray-500"
+                className="px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-wider text-ink-500"
               >
                 {label}
               </div>
             ))}
-            <div className="px-2 py-1 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <div className="px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-wider text-ink-500">
               Week
             </div>
 
@@ -57,22 +57,22 @@ export default function WeekCalendar({
                   key={dateKey}
                   type="button"
                   onClick={() => setSelectedDateKey(dateKey)}
-                  className={`min-h-[120px] rounded-lg border p-3 text-left transition hover:border-blue-400 hover:shadow-sm ${
+                  className={`min-h-[120px] rounded-xl border p-3 text-left transition hover:border-brand-300 hover:shadow-soft ${
                     isToday
-                      ? "border-blue-500 bg-blue-50 ring-1 ring-blue-200"
-                      : "border-gray-200 bg-white"
+                      ? "border-brand-500 bg-brand-50 ring-1 ring-brand-200"
+                      : "border-ink-100 bg-white"
                   }`}
                 >
                   <div className="mb-2 flex items-center justify-between">
                     <span
                       className={`text-sm font-semibold ${
-                        isToday ? "text-blue-700" : "text-gray-900"
+                        isToday ? "text-brand-700" : "text-ink-900"
                       }`}
                     >
                       {date.getDate()}
                     </span>
                     {(byDate[dateKey]?.length ?? 0) > 0 && (
-                      <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
+                      <span className="rounded-full bg-ink-100 px-1.5 py-0.5 text-[10px] text-ink-500">
                         {byDate[dateKey].length}
                       </span>
                     )}
@@ -82,8 +82,10 @@ export default function WeekCalendar({
               );
             })}
 
-            <div className="min-h-[120px] rounded-lg border-2 border-gray-300 bg-gray-50 p-3">
-              <p className="mb-2 text-sm font-semibold text-gray-700">Total</p>
+            <div className="min-h-[120px] rounded-xl border-2 border-ink-200 bg-ink-50 p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">
+                Total
+              </p>
               <DayTotalsDisplay totals={weekTotals} compact />
             </div>
           </div>

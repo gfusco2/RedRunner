@@ -11,6 +11,7 @@ type ActivityFormProps = {
 
 export default function ActivityForm({ dateKey, onSuccess }: ActivityFormProps) {
   const [type, setType] = useState<ActivityType>("RUN");
+  const [planned, setPlanned] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -20,6 +21,7 @@ export default function ActivityForm({ dateKey, onSuccess }: ActivityFormProps) 
 
     const form = e.currentTarget;
     const formData = new FormData(form);
+    const name = formData.get("name");
     const distance = formData.get("distance_miles");
     const duration = formData.get("duration_minutes");
     const notes = formData.get("notes");
@@ -29,12 +31,15 @@ export default function ActivityForm({ dateKey, onSuccess }: ActivityFormProps) 
         await createActivity({
           date: dateKey,
           type,
+          name: typeof name === "string" ? name : null,
+          planned,
           distance_miles: distance ? Number(distance) : null,
           duration_minutes: duration ? Number(duration) : null,
           notes: typeof notes === "string" ? notes : null,
         });
         form.reset();
         setType("RUN");
+        setPlanned(false);
         onSuccess?.();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to save activity.");
@@ -45,30 +50,51 @@ export default function ActivityForm({ dateKey, onSuccess }: ActivityFormProps) 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Type</label>
-        <select
-          value={type}
-          onChange={(e) => setType(e.target.value as ActivityType)}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-        >
-          <option value="RUN">Run</option>
-          <option value="BIKE">Bike</option>
-          <option value="XTRAIN">X-Train</option>
-        </select>
+        <label className="label-field">Name</label>
+        <input
+          name="name"
+          type="text"
+          className="input-field"
+          placeholder="Easy aerobic · Tempo · Long run"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label-field">Type</label>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value as ActivityType)}
+            className="input-field"
+          >
+            <option value="RUN">Run</option>
+            <option value="BIKE">Bike</option>
+            <option value="XTRAIN">X-Train</option>
+          </select>
+        </div>
+        <div>
+          <label className="label-field">Status</label>
+          <select
+            value={planned ? "planned" : "completed"}
+            onChange={(e) => setPlanned(e.target.value === "planned")}
+            className="input-field"
+          >
+            <option value="completed">Completed</option>
+            <option value="planned">Planned</option>
+          </select>
+        </div>
       </div>
 
       {type === "RUN" && (
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Distance (miles)
-          </label>
+          <label className="label-field">Distance (miles)</label>
           <input
             name="distance_miles"
             type="number"
             step="0.1"
             min="0.1"
             required
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            className="input-field"
             placeholder="5.0"
           />
         </div>
@@ -76,15 +102,13 @@ export default function ActivityForm({ dateKey, onSuccess }: ActivityFormProps) 
 
       {type === "RUN" && (
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Duration (minutes, optional)
-          </label>
+          <label className="label-field">Duration (minutes, optional)</label>
           <input
             name="duration_minutes"
             type="number"
             step="1"
             min="1"
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            className="input-field"
             placeholder="45"
           />
         </div>
@@ -92,39 +116,37 @@ export default function ActivityForm({ dateKey, onSuccess }: ActivityFormProps) 
 
       {(type === "BIKE" || type === "XTRAIN") && (
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Duration (minutes)
-          </label>
+          <label className="label-field">Duration (minutes)</label>
           <input
             name="duration_minutes"
             type="number"
             step="1"
             min="1"
             required
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            className="input-field"
             placeholder="45"
           />
         </div>
       )}
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
+        <label className="label-field">Notes</label>
         <textarea
           name="notes"
           rows={2}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+          className="input-field"
           placeholder="Optional"
         />
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-brand-600">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-      >
-        {pending ? "Saving…" : "Add activity"}
+      <button type="submit" disabled={pending} className="btn-primary w-full">
+        {pending
+          ? "Saving…"
+          : planned
+            ? "Add planned workout"
+            : "Log activity"}
       </button>
     </form>
   );
