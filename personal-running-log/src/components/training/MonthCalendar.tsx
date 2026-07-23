@@ -9,7 +9,8 @@ import {
   type DayTotals,
 } from "lib/training/totals";
 import { WEEKDAY_LABELS, formatWeekLabel, parseDateKey } from "lib/training/dates";
-import { formatMiles } from "lib/training/format";
+import { formatDistance } from "lib/training/format";
+import { usePreferences } from "lib/preferences";
 import DayTotalsDisplay from "./DayTotalsDisplay";
 import DayDetailPanel from "./DayDetailPanel";
 
@@ -17,7 +18,7 @@ export type CalendarWeek = {
   weekStartKey: string;
   weekDays: string[];
   weekTotals: DayTotals;
-  /** First week in the 4-week view — shown taller */
+  /** Real current week — ~30% taller + red tint (moves in the stack as you navigate) */
   emphasized?: boolean;
 };
 
@@ -36,29 +37,31 @@ export default function MonthCalendar({
 }: MonthCalendarProps) {
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   const byDate = groupActivitiesByDate(activities);
+  const { unit } = usePreferences();
+  const zeroLabel = unit === "km" ? "0.0 km" : "0.0 mi";
 
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center gap-4 rounded-xl border border-ink-100 bg-white px-4 py-3 shadow-soft">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
-            Completed miles
+            Completed
           </p>
           <p className="text-xl font-semibold text-brand-700">
             {periodTotals.runMiles > 0
-              ? formatMiles(periodTotals.runMiles)
-              : "0.0 mi"}
+              ? formatDistance(periodTotals.runMiles, unit)
+              : zeroLabel}
           </p>
         </div>
         <div className="h-8 w-px bg-ink-100" />
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
-            Planned miles
+            Planned
           </p>
           <p className="text-xl font-semibold text-brand-400">
             {periodTotals.plannedRunMiles > 0
-              ? formatMiles(periodTotals.plannedRunMiles)
-              : "0.0 mi"}
+              ? formatDistance(periodTotals.plannedRunMiles, unit)
+              : zeroLabel}
           </p>
         </div>
         <div className="h-8 w-px bg-ink-100" />
@@ -67,7 +70,10 @@ export default function MonthCalendar({
             Combined
           </p>
           <p className="text-xl font-semibold text-ink-900">
-            {formatMiles(periodTotals.runMiles + periodTotals.plannedRunMiles)}
+            {formatDistance(
+              periodTotals.runMiles + periodTotals.plannedRunMiles,
+              unit
+            )}
           </p>
         </div>
       </div>
@@ -90,15 +96,23 @@ export default function MonthCalendar({
 
           {weeks.map((week) => {
             const tall = Boolean(week.emphasized);
-            const cellMin = tall ? "min-h-[240px]" : "min-h-[120px]";
+            // Other weeks ~140px; focus week ~30% taller (~182px)
+            const cellMin = tall ? "min-h-[182px]" : "min-h-[140px]";
 
             return (
-              <div key={week.weekStartKey}>
+              <div
+                key={week.weekStartKey}
+                className={
+                  tall
+                    ? "rounded-2xl border border-brand-200 bg-brand-50/60 p-3 ring-1 ring-brand-100"
+                    : undefined
+                }
+              >
                 <p className="mb-1.5 text-xs font-medium text-ink-500">
                   {formatWeekLabel(parseDateKey(week.weekStartKey))}
                   {tall && (
-                    <span className="ml-2 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">
-                      Focus week
+                    <span className="ml-2 rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">
+                      Current week
                     </span>
                   )}
                 </p>
@@ -116,8 +130,10 @@ export default function MonthCalendar({
                         onClick={() => setSelectedDateKey(dateKey)}
                         className={`${cellMin} rounded-xl border p-3 text-left transition hover:border-brand-300 hover:shadow-soft ${
                           isToday
-                            ? "border-brand-500 bg-brand-50 ring-1 ring-brand-200"
-                            : "border-ink-100 bg-white"
+                            ? "border-brand-500 bg-white ring-1 ring-brand-300"
+                            : tall
+                              ? "border-brand-100 bg-white/90"
+                              : "border-ink-100 bg-white"
                         }`}
                       >
                         <div className="mb-2 flex items-center justify-between">
@@ -140,7 +156,11 @@ export default function MonthCalendar({
                   })}
 
                   <div
-                    className={`${cellMin} rounded-xl border-2 border-ink-200 bg-ink-50 p-3`}
+                    className={`${cellMin} rounded-xl border-2 p-3 ${
+                      tall
+                        ? "border-brand-300 bg-white/80"
+                        : "border-ink-200 bg-ink-50"
+                    }`}
                   >
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">
                       Total

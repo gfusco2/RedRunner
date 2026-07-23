@@ -29,9 +29,21 @@ export function getWeekDays(weekStart: Date): Date[] {
   });
 }
 
-/** Four Monday-start weeks beginning at weekStart (current + 3 ahead). */
-export function getFourWeekStarts(weekStart: Date): Date[] {
-  return Array.from({ length: 4 }, (_, i) => addWeeks(weekStart, i));
+/**
+ * Four Monday-start weeks for the training log, top → bottom:
+ * focus week, then previous week, then the two before that.
+ */
+export function getFourWeekStarts(focusWeekStart: Date): Date[] {
+  return Array.from({ length: 4 }, (_, i) => addWeeks(focusWeekStart, -i));
+}
+
+/** Range covering focus week plus the three weeks before it. */
+export function getPastFourWeekRange(focusWeekStart: Date): {
+  start: Date;
+  end: Date;
+} {
+  const firstWeek = addWeeks(focusWeekStart, -3);
+  return getMultiWeekRange(firstWeek, 4);
 }
 
 export function addWeeks(date: Date, weeks: number): Date {

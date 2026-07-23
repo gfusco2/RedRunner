@@ -13,6 +13,46 @@ enum ActivityType {
   XTRAIN
 }
 
+enum Role {
+  RUNNER
+  COACH
+  ADMIN
+}
+
+enum DistanceUnit {
+  MI
+  KM
+}
+
+model User {
+  id           String       @id /// Matches Supabase Auth user id (UUID)
+  email        String       @unique
+  name         String?
+  role         Role         @default(RUNNER)
+  distanceUnit DistanceUnit @default(MI)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  activities       Activity[]
+  coachingLinks    CoachAthlete[] @relation("CoachLinks")
+  athleteLinks     CoachAthlete[] @relation("AthleteLinks")
+}
+
+/// Coach ↔ athlete roster relationship (used in a later phase).
+model CoachAthlete {
+  id        Int      @id @default(autoincrement())
+  coachId   String
+  athleteId String
+  createdAt DateTime @default(now())
+
+  coach   User @relation("CoachLinks", fields: [coachId], references: [id], onDelete: Cascade)
+  athlete User @relation("AthleteLinks", fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([coachId, athleteId])
+  @@index([coachId])
+  @@index([athleteId])
+}
+
 model Activity {
   id               Int          @id @default(autoincrement())
   date             DateTime
@@ -21,14 +61,24 @@ model Activity {
   planned          Boolean      @default(false)
   distance_miles   Float?
   duration_seconds Int?
+  /// Entered pace as seconds per mile (m:ss format in UI). Optional.
+  pace_seconds     Int?
+  /// How hard (1 = easy, 10 = max). Required when completed.
+  difficulty       Int?
+  /// How you felt (1 = awful, 10 = great). Required when completed.
+  feel             Int?
   notes            String?
   shoeId           Int?
   shoe             Shoe?        @relation(fields: [shoeId], references: [id], onDelete: SetNull)
+  /// Owner; null = legacy/unauthenticated entries during rollout.
+  userId           String?
+  user             User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([date])
   @@index([type])
   @@index([planned])
   @@index([shoeId])
+  @@index([userId])
 }
 
 model Shoe {

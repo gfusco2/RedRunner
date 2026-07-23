@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { ActivityType } from "@prisma/client";
+import type { ActivityType, Prisma } from "@prisma/client";
+import { ensureProfile, getAuthUser } from "app/actions/auth";
 import prisma from "lib/prisma";
 import {
-  getMultiWeekRange,
+  getPastFourWeekRange,
   getWeekRange,
   parseDateKey,
 } from "lib/training/dates";
@@ -15,7 +16,12 @@ export type CreateActivityInput = {
   name?: string | null;
   planned?: boolean;
   distance_miles?: number | null;
-  duration_minutes?: number | null;
+  /** Total duration in seconds (from mins + secs UI). */
+  duration_seconds?: number | null;
+  /** Entered pace as seconds per mile (from m:ss UI). Optional. */
+  pace_seconds?: number | null;
+  difficulty?: number | null;
+  feel?: number | null;
   notes?: string | null;
   shoeId?: number | null;
 };
@@ -24,6 +30,37 @@ function revalidateTrainingViews() {
   revalidatePath("/training-log");
   revalidatePath("/dashboard");
   revalidatePath("/");
+}
+
+async function requireUserId(): Promise<string> {
+  const authUser = await getAuthUser();
+  if (!authUser) {
+    throw new Error("Sign in to manage your training log.");
+  }
+  await ensureProfile();
+  return authUser.id;
+}
+
+async function ownerFilter(): Promise<Prisma.ActivityWhereInput | null> {
+  const authUser = await getAuthUser();
+  if (!authUser) return null;
+  return { userId: authUser.id };
+}
+
+function assertScore(
+  label: string,
+  value: number | null | undefined,
+  required: boolean
+): number | null {
+  if (value == null || Number.isNaN(Number(value))) {
+    if (required) throw new Error(`${label} is required (1–10).`);
+    return null;
+  }
+  const n = Math.round(Number(value));
+  if (n < 1 || n > 10) {
+    throw new Error(`${label} must be a whole number from 1 to 10.`);
+  }
+  return n;
 }
 
 function validateActivityInput(input: CreateActivityInput) {
@@ -38,21 +75,37 @@ function validateActivityInput(input: CreateActivityInput) {
   }
 
   if (input.type === "BIKE" || input.type === "XTRAIN") {
-    if (!input.duration_minutes || input.duration_minutes <= 0) {
+    if (!input.duration_seconds || input.duration_seconds <= 0) {
       throw new Error("Duration must be greater than zero.");
     }
   }
+
+  const planned = Boolean(input.planned);
+  assertScore("Difficulty", input.difficulty ?? null, !planned);
+  assertScore("Feel", input.feel ?? null, !planned);
 }
 
 export async function createActivity(input: CreateActivityInput) {
   validateActivityInput(input);
+  const userId = await requireUserId();
 
   const date = parseDateKey(input.date);
   const planned = Boolean(input.planned);
-  const duration_seconds = input.duration_minutes
-    ? Math.round(input.duration_minutes * 60)
-    : null;
+  const duration_seconds =
+    input.duration_seconds != null && input.duration_seconds > 0
+      ? Math.round(input.duration_seconds)
+      : null;
+  const pace_seconds =
+    input.pace_seconds != null && input.pace_seconds > 0
+      ? Math.round(input.pace_seconds)
+      : null;
   const name = input.name?.trim() || null;
+  const difficulty = assertScore(
+    "Difficulty",
+    input.difficulty ?? null,
+    !planned
+  );
+  const feel = assertScore("Feel", input.feel ?? null, !planned);
 
   const activity = await prisma.activity.create({
     data: {
@@ -61,15 +114,19 @@ export async function createActivity(input: CreateActivityInput) {
       name,
       planned,
       distance_miles: input.type === "RUN" ? input.distance_miles ?? null : null,
-      duration_seconds:
-        input.type === "RUN" ? duration_seconds : duration_seconds ?? null,
+      duration_seconds,
+      pace_seconds: input.type === "RUN" ? pace_seconds : null,
+      difficulty,
+      feel,
       notes: input.notes?.trim() || null,
-      shoeId: input.type === "RUN" ? input.shoeId ?? null : null,
+      user: { connect: { id: userId } },
+      ...(input.type === "RUN" && input.shoeId
+        ? { shoe: { connect: { id: input.shoeId } } }
+        : {}),
     },
     include: { shoe: true },
   });
 
-  // Only count completed runs toward shoe mileage
   if (
     !planned &&
     input.type === "RUN" &&
@@ -86,8 +143,14 @@ export async function createActivity(input: CreateActivityInput) {
   return activity;
 }
 
-export async function markActivityCompleted(id: number) {
-  const existing = await prisma.activity.findUnique({ where: { id } });
+export async function markActivityCompleted(
+  id: number,
+  scores: { difficulty: number; feel: number }
+) {
+  const userId = await requireUserId();
+  const existing = await prisma.activity.findFirst({
+    where: { id, userId },
+  });
   if (!existing) {
     throw new Error("Activity not found.");
   }
@@ -95,17 +158,20 @@ export async function markActivityCompleted(id: number) {
     return existing;
   }
 
+  const difficulty = assertScore("Difficulty", scores.difficulty, true);
+  const feel = assertScore("Feel", scores.feel, true);
+
   const updated = await prisma.activity.update({
     where: { id },
-    data: { planned: false },
+    data: {
+      planned: false,
+      difficulty,
+      feel,
+    },
     include: { shoe: true },
   });
 
-  if (
-    updated.type === "RUN" &&
-    updated.shoeId &&
-    updated.distance_miles
-  ) {
+  if (updated.type === "RUN" && updated.shoeId && updated.distance_miles) {
     await prisma.shoe.update({
       where: { id: updated.shoeId },
       data: { total_miles: { increment: updated.distance_miles } },
@@ -117,7 +183,10 @@ export async function markActivityCompleted(id: number) {
 }
 
 export async function deleteActivity(id: number) {
-  const existing = await prisma.activity.findUnique({ where: { id } });
+  const userId = await requireUserId();
+  const existing = await prisma.activity.findFirst({
+    where: { id, userId },
+  });
   if (!existing) {
     throw new Error("Activity not found.");
   }
@@ -139,11 +208,15 @@ export async function deleteActivity(id: number) {
 }
 
 export async function getActivitiesForWeek(weekStartKey: string) {
+  const owner = await ownerFilter();
+  if (!owner) return [];
+
   const weekStart = parseDateKey(weekStartKey);
   const { start, end } = getWeekRange(weekStart);
 
   return prisma.activity.findMany({
     where: {
+      ...owner,
       date: { gte: start, lt: end },
     },
     include: { shoe: true },
@@ -151,13 +224,17 @@ export async function getActivitiesForWeek(weekStartKey: string) {
   });
 }
 
-/** Fetch activities across 4 Monday-start weeks from weekStartKey. */
+/** Fetch activities for focus week plus the three weeks before it. */
 export async function getActivitiesForFourWeeks(weekStartKey: string) {
-  const weekStart = parseDateKey(weekStartKey);
-  const { start, end } = getMultiWeekRange(weekStart, 4);
+  const owner = await ownerFilter();
+  if (!owner) return [];
+
+  const focusWeekStart = parseDateKey(weekStartKey);
+  const { start, end } = getPastFourWeekRange(focusWeekStart);
 
   return prisma.activity.findMany({
     where: {
+      ...owner,
       date: { gte: start, lt: end },
     },
     include: { shoe: true },

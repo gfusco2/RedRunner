@@ -17,7 +17,7 @@ export async function createRun(input: CreateRunInput) {
     date: input.date,
     type: "RUN",
     distance_miles: input.distance_miles,
-    duration_minutes: input.duration_seconds / 60,
+    duration_seconds: input.duration_seconds,
     notes: input.notes,
     shoeId: input.shoeId,
   });
@@ -26,6 +26,8 @@ export async function createRun(input: CreateRunInput) {
 /** @deprecated Use getActivitiesForWeek from activities.ts */
 export async function getRuns() {
   const { getMonday, toDateKey } = await import("lib/training/dates");
-  const activities = await getActivitiesForWeek(toDateKey(getMonday(new Date())));
+  const activities = await getActivitiesForWeek(
+    toDateKey(getMonday(new Date()))
+  );
   return activities.filter((a) => a.type === "RUN");
 }
