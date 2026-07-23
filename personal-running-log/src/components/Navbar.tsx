@@ -7,6 +7,7 @@ import { signOut } from "app/actions/auth";
 const tabs = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/training-log", label: "Training Log" },
+  { href: "/reports", label: "Reports" },
   { href: "/settings", label: "Settings" },
 ] as const;
 

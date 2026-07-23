@@ -1,6 +1,6 @@
 "use client";
 
-import type { Activity } from "@prisma/client";
+import type { ActivityWithDetails } from "app/actions/activities";
 import { useState } from "react";
 import {
   groupActivitiesByDate,
@@ -11,6 +11,7 @@ import {
 import { WEEKDAY_LABELS, formatWeekLabel, parseDateKey } from "lib/training/dates";
 import { formatDistance } from "lib/training/format";
 import { usePreferences } from "lib/preferences";
+import type { GoalBand } from "lib/training/goals";
 import DayTotalsDisplay from "./DayTotalsDisplay";
 import DayDetailPanel from "./DayDetailPanel";
 
@@ -20,13 +21,16 @@ export type CalendarWeek = {
   weekTotals: DayTotals;
   /** Real current week — ~30% taller + red tint (moves in the stack as you navigate) */
   emphasized?: boolean;
+  goal?: GoalBand | null;
 };
 
 type MonthCalendarProps = {
   weeks: CalendarWeek[];
-  activities: Activity[];
+  activities: ActivityWithDetails[];
   todayKey: string;
   periodTotals: DayTotals;
+  /** Goal for the focus / current week in the stack. */
+  focusGoal?: GoalBand | null;
 };
 
 export default function MonthCalendar({
@@ -34,6 +38,7 @@ export default function MonthCalendar({
   activities,
   todayKey,
   periodTotals,
+  focusGoal,
 }: MonthCalendarProps) {
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   const byDate = groupActivitiesByDate(activities);
@@ -44,8 +49,8 @@ export default function MonthCalendar({
     <>
       <div className="mb-4 flex flex-wrap items-center gap-4 rounded-xl border border-ink-100 bg-white px-4 py-3 shadow-soft">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
-            Completed
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-700">
+            Actual
           </p>
           <p className="text-xl font-semibold text-brand-700">
             {periodTotals.runMiles > 0
@@ -55,25 +60,28 @@ export default function MonthCalendar({
         </div>
         <div className="h-8 w-px bg-ink-100" />
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-600">
+            Goal
+          </p>
+          <p className="text-xl font-semibold text-ink-900">
+            {focusGoal ? formatDistance(focusGoal.goal, unit) : zeroLabel}
+          </p>
+          {focusGoal && (
+            <p className="text-[10px] text-ink-500">
+              {formatDistance(focusGoal.low, unit)}–
+              {formatDistance(focusGoal.high, unit)}
+            </p>
+          )}
+        </div>
+        <div className="h-8 w-px bg-ink-100" />
+        <div className="opacity-70">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">
             Planned
           </p>
-          <p className="text-xl font-semibold text-brand-400">
+          <p className="text-lg font-medium text-ink-500">
             {periodTotals.plannedRunMiles > 0
               ? formatDistance(periodTotals.plannedRunMiles, unit)
               : zeroLabel}
-          </p>
-        </div>
-        <div className="h-8 w-px bg-ink-100" />
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
-            Combined
-          </p>
-          <p className="text-xl font-semibold text-ink-900">
-            {formatDistance(
-              periodTotals.runMiles + periodTotals.plannedRunMiles,
-              unit
-            )}
           </p>
         </div>
       </div>
@@ -165,6 +173,16 @@ export default function MonthCalendar({
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">
                       Total
                     </p>
+                    {week.goal && (
+                      <p className="mb-1.5 text-[10px] text-ink-500">
+                        Goal {formatDistance(week.goal.goal, unit)}
+                        <span className="text-ink-400">
+                          {" "}
+                          ({formatDistance(week.goal.low, unit)}–
+                          {formatDistance(week.goal.high, unit)})
+                        </span>
+                      </p>
+                    )}
                     {hasAnyTotals(week.weekTotals) ? (
                       <DayTotalsDisplay totals={week.weekTotals} compact />
                     ) : (

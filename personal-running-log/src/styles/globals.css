@@ -11,6 +11,22 @@
   body {
     @apply bg-ink-50 text-ink-900;
   }
+
+  @media print {
+    nav,
+    footer,
+    .print\:hidden {
+      display: none !important;
+    }
+
+    body {
+      background: white;
+    }
+
+    main {
+      padding: 0 !important;
+    }
+  }
 }
 
 @layer components {
@@ -43,7 +59,20 @@
     box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
   }
 
+  .input-field-primary {
+    @apply w-full rounded-md border-2 border-brand-300 bg-brand-50 px-3 py-2.5 text-base font-semibold text-ink-900;
+  }
+
+  .input-field-primary:focus {
+    @apply border-brand-600 outline-none;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
+  }
+
   .label-field {
     @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-500;
+  }
+
+  .label-field-primary {
+    @apply mb-1 block text-xs font-bold uppercase tracking-wide text-brand-700;
   }
 }

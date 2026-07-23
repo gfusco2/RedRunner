@@ -1,11 +1,10 @@
 "use client";
 
-import type { Activity } from "@prisma/client";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import type { ActivityWithDetails } from "app/actions/activities";
 import {
   deleteActivity,
-  markActivityCompleted,
 } from "app/actions/activities";
 import {
   formatDistance,
@@ -17,15 +16,20 @@ import {
 import { ACTIVITY_LABELS } from "lib/training/totals";
 import { parseDateKey } from "lib/training/dates";
 import { usePreferences } from "lib/preferences";
+import {
+  SEGMENT_KIND_SHORT,
+  TAG_LABELS,
+  TAG_PILL_CLASS,
+} from "lib/training/tags";
 import ActivityForm from "./ActivityForm";
+import CompleteWorkoutForm from "./CompleteWorkoutForm";
+import DayWellnessForm from "./DayWellnessForm";
 
 type DayDetailPanelProps = {
   dateKey: string;
-  activities: Activity[];
+  activities: ActivityWithDetails[];
   onClose: () => void;
 };
-
-const SCORE_OPTIONS = Array.from({ length: 10 }, (_, i) => i + 1);
 
 export default function DayDetailPanel({
   dateKey,
@@ -36,12 +40,19 @@ export default function DayDetailPanel({
   const { unit } = usePreferences();
   const [pending, startTransition] = useTransition();
   const [completingId, setCompletingId] = useState<number | null>(null);
-  const [completeError, setCompleteError] = useState<string | null>(null);
   const dateLabel = parseDateKey(dateKey).toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
   });
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   function refresh() {
     router.refresh();
@@ -54,52 +65,45 @@ export default function DayDetailPanel({
     });
   }
 
-  function handleComplete(
-    e: React.FormEvent<HTMLFormElement>,
-    id: number
-  ) {
-    e.preventDefault();
-    setCompleteError(null);
-    const formData = new FormData(e.currentTarget);
-    const difficulty = Number(formData.get("difficulty"));
-    const feel = Number(formData.get("feel"));
-
-    startTransition(async () => {
-      try {
-        await markActivityCompleted(id, { difficulty, feel });
-        setCompletingId(null);
-        refresh();
-      } catch (err) {
-        setCompleteError(
-          err instanceof Error ? err.message : "Could not complete workout."
-        );
-      }
-    });
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/50 p-4 sm:items-center">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-soft">
-        <div className="flex items-center justify-between border-b border-ink-100 px-4 py-3">
-          <h2 className="text-lg font-semibold text-ink-900">{dateLabel}</h2>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-ink-950 bg-opacity-50 p-0 sm:items-center sm:p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="flex w-full max-w-lg flex-col overflow-hidden rounded-t-xl bg-white shadow-soft sm:rounded-xl"
+        style={{ height: "min(90dvh, 900px)", maxHeight: "90dvh" }}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-ink-100 bg-white px-4 py-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+              Day detail
+            </p>
+            <h2 className="text-lg font-semibold text-ink-900">{dateLabel}</h2>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md px-2 py-1 text-sm text-ink-500 hover:bg-ink-50"
+            className="rounded-md border border-ink-200 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-ink-50"
           >
             Close
           </button>
         </div>
 
-        <div className="space-y-5 p-4">
-          <section>
-            <h3 className="label-field mb-2">Activities</h3>
+        <div
+          className="flex-1 overflow-y-auto overscroll-contain px-4 py-4"
+          style={{ minHeight: 0, WebkitOverflowScrolling: "touch" }}
+        >
+          <section className="mb-5">
+            <h3 className="label-field mb-2">Logged today</h3>
             {activities.length === 0 ? (
-              <p className="text-sm text-ink-500">
+              <p className="rounded-lg border border-dashed border-ink-200 bg-ink-50 px-3 py-4 text-sm text-ink-500">
                 Nothing logged yet — add one below.
               </p>
             ) : (
-              <ul className="divide-y divide-ink-100 overflow-hidden rounded-lg border border-ink-100">
+              <ul className="space-y-2">
                 {activities.map((activity) => {
                   const enteredPace =
                     activity.type === "RUN"
@@ -107,46 +111,120 @@ export default function DayDetailPanel({
                       : null;
 
                   return (
-                    <li key={activity.id} className="px-3 py-2.5">
+                    <li
+                      key={activity.id}
+                      className="rounded-lg border border-ink-100 bg-white px-3 py-2.5 shadow-sm"
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-medium text-ink-900">
+                            <p className="font-semibold text-ink-900">
                               {activity.name?.trim() ||
                                 ACTIVITY_LABELS[activity.type]}
                             </p>
                             {activity.planned ? (
-                              <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-600">
+                              <span className="rounded bg-gold-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gold-700">
                                 Planned
                               </span>
                             ) : (
-                              <span className="rounded bg-ink-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+                              <span className="rounded bg-trail-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-trail-700">
                                 Done
                               </span>
                             )}
-                            {activity.name?.trim() && (
-                              <span className="text-xs text-ink-500">
-                                {ACTIVITY_LABELS[activity.type]}
+                            {activity.prescribedById && (
+                              <span className="rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-700">
+                                From coach
                               </span>
                             )}
                           </div>
-                          <p className="text-sm text-ink-500">
+
+                          {activity.tags.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {activity.tags.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${TAG_PILL_CLASS[tag]}`}
+                                >
+                                  {TAG_LABELS[tag]}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          <p className="mt-1 text-sm font-medium text-brand-700">
                             {activity.type === "RUN" &&
                               activity.distance_miles != null &&
-                              formatDistance(activity.distance_miles, unit)}
+                              `Total ${formatDistance(activity.distance_miles, unit)}`}
                             {activity.type !== "RUN" &&
                               activity.duration_seconds != null &&
                               formatDuration(activity.duration_seconds)}
                             {activity.type === "RUN" &&
                               activity.duration_seconds != null &&
                               ` · ${formatMinSec(activity.duration_seconds)}`}
-                            {enteredPace && ` · ${enteredPace}`}
+                            {enteredPace && ` · main ${enteredPace}`}
                           </p>
+
+                          {activity.segments.length > 0 && (
+                            <ul className="mt-1.5 space-y-0.5 text-xs text-ink-500">
+                              {activity.segments.map((seg) => {
+                                const bits: string[] = [
+                                  SEGMENT_KIND_SHORT[seg.kind],
+                                ];
+                                if (seg.distance_miles != null) {
+                                  bits.push(
+                                    formatDistance(seg.distance_miles, unit)
+                                  );
+                                }
+                                if (seg.duration_seconds != null) {
+                                  bits.push(formatMinSec(seg.duration_seconds));
+                                }
+                                if (seg.pace_seconds != null) {
+                                  const p = formatPaceDisplay(
+                                    seg.pace_seconds,
+                                    unit
+                                  );
+                                  if (p) bits.push(p);
+                                }
+                                return (
+                                  <li key={seg.id}>
+                                    {bits.join(" · ")}
+                                    {seg.notes ? ` — ${seg.notes}` : ""}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+
                           {!activity.planned && (
                             <p className="mt-0.5 text-xs text-ink-500">
                               Diff {formatScore(activity.difficulty)} · Feel{" "}
                               {formatScore(activity.feel)}
                             </p>
+                          )}
+                          {activity.splits?.length > 0 && (
+                            <ul className="mt-1.5 space-y-0.5 text-xs text-ink-600">
+                              {activity.splits.map((split) => {
+                                const bits: string[] = [
+                                  split.label || "Rep",
+                                ];
+                                if (split.distance_miles != null) {
+                                  bits.push(
+                                    formatDistance(split.distance_miles, unit)
+                                  );
+                                }
+                                if (split.duration_seconds != null) {
+                                  bits.push(
+                                    formatMinSec(split.duration_seconds)
+                                  );
+                                }
+                                if (split.rest_seconds != null) {
+                                  bits.push(`${split.rest_seconds}s rest`);
+                                }
+                                return (
+                                  <li key={split.id}>{bits.join(" · ")}</li>
+                                );
+                              })}
+                            </ul>
                           )}
                           {activity.notes && (
                             <p className="mt-1 text-xs text-ink-500">
@@ -159,11 +237,8 @@ export default function DayDetailPanel({
                             <button
                               type="button"
                               disabled={pending}
-                              onClick={() => {
-                                setCompletingId(activity.id);
-                                setCompleteError(null);
-                              }}
-                              className="text-xs font-medium text-brand-600 hover:text-brand-800 disabled:opacity-50"
+                              onClick={() => setCompletingId(activity.id)}
+                              className="text-xs font-semibold text-brand-600 hover:text-brand-800 disabled:opacity-50"
                             >
                               Mark done
                             </button>
@@ -180,71 +255,14 @@ export default function DayDetailPanel({
                       </div>
 
                       {activity.planned && completingId === activity.id && (
-                        <form
-                          onSubmit={(e) => handleComplete(e, activity.id)}
-                          className="mt-3 space-y-2 rounded-lg border border-brand-100 bg-brand-50/50 p-3"
-                        >
-                          <p className="text-xs font-medium text-ink-700">
-                            Rate this workout to mark it complete
-                          </p>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="label-field">Difficulty</label>
-                              <select
-                                name="difficulty"
-                                required
-                                className="input-field"
-                                defaultValue=""
-                              >
-                                <option value="" disabled>
-                                  1–10
-                                </option>
-                                {SCORE_OPTIONS.map((n) => (
-                                  <option key={n} value={n}>
-                                    {n}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="label-field">Feel</label>
-                              <select
-                                name="feel"
-                                required
-                                className="input-field"
-                                defaultValue=""
-                              >
-                                <option value="" disabled>
-                                  1–10
-                                </option>
-                                {SCORE_OPTIONS.map((n) => (
-                                  <option key={n} value={n}>
-                                    {n}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-                          {completeError && (
-                            <p className="text-xs text-brand-600">{completeError}</p>
-                          )}
-                          <div className="flex gap-2">
-                            <button
-                              type="submit"
-                              disabled={pending}
-                              className="btn-primary flex-1"
-                            >
-                              {pending ? "Saving…" : "Complete"}
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-ghost"
-                              onClick={() => setCompletingId(null)}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </form>
+                        <CompleteWorkoutForm
+                          activity={activity}
+                          onDone={() => {
+                            setCompletingId(null);
+                            refresh();
+                          }}
+                          onCancel={() => setCompletingId(null)}
+                        />
                       )}
                     </li>
                   );
@@ -253,8 +271,12 @@ export default function DayDetailPanel({
             )}
           </section>
 
-          <section>
-            <h3 className="label-field mb-2">Add</h3>
+          <section className="mb-5">
+            <DayWellnessForm dateKey={dateKey} />
+          </section>
+
+          <section className="rounded-xl border border-ink-100 bg-ink-50 p-3">
+            <h3 className="mb-3 text-sm font-bold text-ink-900">Add activity</h3>
             <ActivityForm dateKey={dateKey} onSuccess={refresh} />
           </section>
         </div>

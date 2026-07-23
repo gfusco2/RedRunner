@@ -13,6 +13,19 @@ enum ActivityType {
   XTRAIN
 }
 
+enum ActivityTag {
+  EASY
+  WORKOUT
+  RACE
+  LONG
+}
+
+enum SegmentKind {
+  WU
+  MAIN
+  CD
+}
+
 enum Role {
   RUNNER
   COACH
@@ -34,6 +47,10 @@ model User {
   updatedAt    DateTime     @updatedAt
 
   activities       Activity[]
+  prescribedActivities Activity[] @relation("PrescribedActivities")
+  dayWellness      DayWellness[]
+  weekPlans        WeekPlan[]     @relation("AthleteWeekPlans")
+  coachedWeekPlans WeekPlan[]     @relation("CoachWeekPlans")
   coachingLinks    CoachAthlete[] @relation("CoachLinks")
   athleteLinks     CoachAthlete[] @relation("AthleteLinks")
 }
@@ -54,31 +71,77 @@ model CoachAthlete {
 }
 
 model Activity {
-  id               Int          @id @default(autoincrement())
+  id               Int           @id @default(autoincrement())
   date             DateTime
   type             ActivityType
   name             String?
-  planned          Boolean      @default(false)
+  planned          Boolean       @default(false)
+  /// Denormalized total run miles (sum of segment distances).
   distance_miles   Float?
+  /// Denormalized total duration (sum of segment durations when present).
   duration_seconds Int?
-  /// Entered pace as seconds per mile (m:ss format in UI). Optional.
+  /// Primary pace (usually MAIN), seconds per mile.
   pace_seconds     Int?
   /// How hard (1 = easy, 10 = max). Required when completed.
   difficulty       Int?
   /// How you felt (1 = awful, 10 = great). Required when completed.
   feel             Int?
   notes            String?
+  /// Intent tags; multi-select (e.g. LONG + WORKOUT).
+  tags             ActivityTag[]
   shoeId           Int?
-  shoe             Shoe?        @relation(fields: [shoeId], references: [id], onDelete: SetNull)
+  shoe             Shoe?         @relation(fields: [shoeId], references: [id], onDelete: SetNull)
   /// Owner; null = legacy/unauthenticated entries during rollout.
   userId           String?
-  user             User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user             User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// Set when a coach prescribed this planned (or completed) session.
+  prescribedById   String?
+  prescribedBy     User?         @relation("PrescribedActivities", fields: [prescribedById], references: [id], onDelete: SetNull)
+  segments         ActivitySegment[]
+  /// Interval / rep results logged when completing (athlete-reported).
+  splits           ActivitySplit[]
 
   @@index([date])
   @@index([type])
   @@index([planned])
   @@index([shoeId])
   @@index([userId])
+  @@index([prescribedById])
+}
+
+/// Warm-up / main / cool-down parts of a run. Distances and times are always explicit when set.
+model ActivitySegment {
+  id               Int         @id @default(autoincrement())
+  activityId       Int
+  activity         Activity    @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  kind             SegmentKind
+  sortOrder        Int         @default(0)
+  distance_miles   Float?
+  duration_seconds Int?
+  /// Pace for this segment (seconds per mile). Usually set on MAIN.
+  pace_seconds     Int?
+  /// e.g. "8x1k @ 3:10, 90s jog"
+  notes            String?
+
+  @@index([activityId])
+  @@index([kind])
+}
+
+/// Athlete-reported interval / rep results (e.g. 6×800m times).
+model ActivitySplit {
+  id               Int      @id @default(autoincrement())
+  activityId       Int
+  activity         Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  sortOrder        Int      @default(0)
+  /// e.g. "Rep 1", "800m", "400m"
+  label            String?
+  distance_miles   Float?
+  duration_seconds Int?
+  /// Standing / jog rest after this rep, if logged.
+  rest_seconds     Int?
+  notes            String?
+
+  @@index([activityId])
 }
 
 model Shoe {
@@ -88,4 +151,46 @@ model Shoe {
   total_miles Float      @default(0)
   active      Boolean    @default(true)
   activities  Activity[]
+}
+
+/// Per-day strength / stretch checklist (supplemental to activities).
+model DayWellness {
+  id             Int      @id @default(autoincrement())
+  userId         String
+  date           DateTime
+  strengthDone   Boolean  @default(false)
+  strengthFocus  String?
+  stretchDone    Boolean  @default(false)
+  stretchFocus   String?
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+}
+
+/// Weekly mileage / structure plan for an athlete (self or coach-authored).
+model WeekPlan {
+  id              Int      @id @default(autoincrement())
+  athleteId       String
+  coachId         String?
+  weekStart       DateTime
+  /// Target weekly run mileage (center of the goal band).
+  goalRunMiles    Float?
+  /// Half-width of the goal band in miles (default 5 → goal ± 5).
+  goalRangeMiles  Float?   @default(5)
+  runDays         Int?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  athlete User  @relation("AthleteWeekPlans", fields: [athleteId], references: [id], onDelete: Cascade)
+  coach   User? @relation("CoachWeekPlans", fields: [coachId], references: [id], onDelete: SetNull)
+
+  @@unique([athleteId, weekStart])
+  @@index([athleteId])
+  @@index([coachId])
+  @@index([weekStart])
 }

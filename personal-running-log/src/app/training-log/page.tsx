@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { getActivitiesForFourWeeks } from "app/actions/activities";
 import { getCurrentProfile } from "app/actions/auth";
-import { getMonday, parseDateKey, toDateKey } from "lib/training/dates";
+import { getWeekPlansInRange } from "app/actions/weekPlans";
+import {
+  getMonday,
+  getPastFourWeekRange,
+  parseDateKey,
+  toDateKey,
+} from "lib/training/dates";
+import { plansByWeekKey } from "lib/training/weekPlans";
 import TrainingLogView from "./TrainingLogView";
 
 type PageProps = {
@@ -12,9 +19,13 @@ export default async function TrainingLogPage({ searchParams }: PageProps) {
   const { week } = await searchParams;
   const weekStart = week ? parseDateKey(week) : getMonday(new Date());
   const weekStartKey = toDateKey(weekStart);
-  const [activities, profile] = await Promise.all([
+  const { start: rangeStart } = getPastFourWeekRange(weekStart);
+  const rangeStartKey = toDateKey(rangeStart);
+  // Include focus week Monday through that week's Monday only for plan lookup
+  const [activities, profile, weekPlans] = await Promise.all([
     getActivitiesForFourWeeks(weekStartKey),
     getCurrentProfile(),
+    getWeekPlansInRange(rangeStartKey, weekStartKey),
   ]);
 
   return (
@@ -27,7 +38,11 @@ export default async function TrainingLogPage({ searchParams }: PageProps) {
           to save activities to your account.
         </div>
       )}
-      <TrainingLogView weekStartKey={weekStartKey} activities={activities} />
+      <TrainingLogView
+        weekStartKey={weekStartKey}
+        activities={activities}
+        plansByWeek={plansByWeekKey(weekPlans)}
+      />
     </div>
   );
 }

@@ -36,12 +36,12 @@ export default function LoginForm() {
           const { error: resetError } = await supabase.auth.resetPasswordForEmail(
             trimmedEmail,
             {
-              redirectTo: `${origin}/auth/update-password`,
+              redirectTo: `${origin}/auth/callback?next=/auth/update-password`,
             }
           );
           if (resetError) throw resetError;
           setMessage(
-            "Password reset email sent. Open the newest link in this same browser (not another device)."
+            "Password reset email sent. Open the newest link in this same browser (Chrome/Safari — not the email app’s built-in browser if possible)."
           );
           return;
         }
@@ -51,12 +51,12 @@ export default function LoginForm() {
             email: trimmedEmail,
             password,
             options: {
-              emailRedirectTo: `${origin}/auth/confirm?next=/settings`,
+              emailRedirectTo: `${origin}/auth/callback?next=/settings`,
             },
           });
           if (signUpError) throw signUpError;
           setMessage(
-            "Account created. Check your email to confirm, then sign in with the same password."
+            "Account created. If email confirmation is on, open the newest link in this browser, then sign in."
           );
           setMode("signin");
           return;

@@ -1,20 +1,23 @@
+import { type EmailOtpType } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Handles ?code= from Supabase verify redirects (default email templates).
- * Prefer /auth/confirm + token_hash templates for SSR reliability.
+ * Default destination for Supabase email redirects (?code= from PKCE).
+ * Also accepts token_hash + type.
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const token_hash = searchParams.get("token_hash");
-  const type = searchParams.get("type");
+  const type = searchParams.get("type") as EmailOtpType | null;
   const nextParam = searchParams.get("next");
   const next =
     nextParam && nextParam.startsWith("/")
       ? nextParam
-      : "/auth/update-password";
+      : type === "recovery"
+        ? "/auth/update-password"
+        : "/settings";
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -22,6 +25,7 @@ export async function GET(request: NextRequest) {
   const fail = (message: string) => {
     const dest = request.nextUrl.clone();
     dest.pathname = "/login";
+    dest.search = "";
     dest.searchParams.set("error", message);
     return NextResponse.redirect(dest);
   };
@@ -30,20 +34,18 @@ export async function GET(request: NextRequest) {
     return fail("Supabase env vars are missing. Restart the dev server.");
   }
 
-  // token_hash links should use /auth/confirm; support them here too
   if (token_hash && type) {
     const dest = request.nextUrl.clone();
     dest.pathname = "/auth/confirm";
-    // keep token_hash, type, next query params
     return NextResponse.redirect(dest);
   }
 
   if (!code) {
-    const supabaseError = searchParams.get("error_description") ||
-      searchParams.get("error");
+    const supabaseError =
+      searchParams.get("error_description") || searchParams.get("error");
     return fail(
       supabaseError ||
-        "Reset link had no auth code. Add http://localhost:3000/** under Authentication → URL Configuration → Redirect URLs, then request a new reset email."
+        "Auth link had no code. Set Site URL to http://localhost:3000 and Redirect URLs to http://localhost:3000/**, then use a fresh email link in this browser."
     );
   }
 
@@ -72,11 +74,19 @@ export async function GET(request: NextRequest) {
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
-    // Fall back to client exchange on the update-password page (same-browser PKCE)
     const dest = request.nextUrl.clone();
-    dest.pathname = "/auth/update-password";
-    dest.searchParams.set("code", code);
-    if (nextParam) dest.searchParams.set("next", next);
+    dest.pathname = next.includes("update-password")
+      ? "/auth/update-password"
+      : "/login";
+    dest.search = "";
+    if (next.includes("update-password")) {
+      dest.searchParams.set("code", code);
+    } else {
+      dest.searchParams.set(
+        "error",
+        `${error.message} Open the newest email link in the same browser you used to sign up / reset.`
+      );
+    }
     return NextResponse.redirect(dest);
   }
 

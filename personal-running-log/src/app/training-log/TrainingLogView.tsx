@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import type { Activity } from "@prisma/client";
+import type { ActivityWithDetails } from "app/actions/activities";
+import type { WeekPlan } from "@prisma/client";
 import MonthCalendar, {
   type CalendarWeek,
 } from "components/training/MonthCalendar";
@@ -15,6 +16,7 @@ import {
   getMonday,
   getPastFourWeekRange,
 } from "lib/training/dates";
+import { goalBand } from "lib/training/goals";
 import {
   buildWeekCalendarData,
   sumTotals,
@@ -24,12 +26,14 @@ import {
 
 type TrainingLogViewProps = {
   weekStartKey: string;
-  activities: Activity[];
+  activities: ActivityWithDetails[];
+  plansByWeek: Record<string, WeekPlan>;
 };
 
 export default function TrainingLogView({
   weekStartKey,
   activities,
+  plansByWeek,
 }: TrainingLogViewProps) {
   const weekStart = parseDateKey(weekStartKey);
   const prevWeekKey = toDateKey(addWeeks(weekStart, -1));
@@ -48,12 +52,13 @@ export default function TrainingLogView({
       activities,
       new Date()
     );
+    const plan = plansByWeek[weekKey];
     return {
       weekStartKey: weekKey,
       weekDays,
       weekTotals,
-      // Emphasize the real current week wherever it sits in the stack
       emphasized: weekKey === currentWeekKey,
+      goal: goalBand(plan?.goalRunMiles, plan?.goalRangeMiles),
     };
   });
 
@@ -62,6 +67,13 @@ export default function TrainingLogView({
   const periodTotals = sumTotals(
     allDayKeys.map((key) => totalsForActivities(byDate[key] ?? []))
   );
+
+  const focusGoal =
+    weeks.find((w) => w.emphasized)?.goal ??
+    goalBand(
+      plansByWeek[currentWeekKey]?.goalRunMiles,
+      plansByWeek[currentWeekKey]?.goalRangeMiles
+    );
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -93,8 +105,8 @@ export default function TrainingLogView({
       </div>
 
       <p className="mb-5 text-sm text-ink-500">
-        Click a day to log or plan. Planned miles show in lighter red; completed
-        miles in solid red.
+        Click a day to log or plan. Goal is the weekly target; planned miles are
+        what you’ve written on the calendar.
       </p>
 
       <MonthCalendar
@@ -102,6 +114,7 @@ export default function TrainingLogView({
         activities={activities}
         todayKey={todayKey}
         periodTotals={periodTotals}
+        focusGoal={focusGoal}
       />
     </div>
   );

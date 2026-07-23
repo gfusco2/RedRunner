@@ -1,6 +1,6 @@
 "use client";
 
-import type { Activity } from "@prisma/client";
+import type { ActivityWithDetails } from "app/actions/activities";
 import { useState } from "react";
 import {
   groupActivitiesByDate,
@@ -10,12 +10,15 @@ import {
 import { WEEKDAY_LABELS } from "lib/training/dates";
 import DayTotalsDisplay from "./DayTotalsDisplay";
 import DayDetailPanel from "./DayDetailPanel";
+import CoachDayPanel from "components/coach/CoachDayPanel";
 
 type WeekCalendarProps = {
   weekDays: string[];
-  activities: Activity[];
+  activities: ActivityWithDetails[];
   weekTotals: DayTotals;
   todayKey: string;
+  /** When set, day clicks open coach prescribe panel for this athlete. */
+  coachAthleteId?: string;
 };
 
 export default function WeekCalendar({
@@ -23,6 +26,7 @@ export default function WeekCalendar({
   activities,
   weekTotals,
   todayKey,
+  coachAthleteId,
 }: WeekCalendarProps) {
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   const byDate = groupActivitiesByDate(activities);
@@ -51,6 +55,8 @@ export default function WeekCalendar({
               const date = new Date(dateKey + "T12:00:00");
               const totals = dayTotalsList[index];
               const isToday = dateKey === todayKey;
+              const dayActs = byDate[dateKey] ?? [];
+              const hasCoachPlan = dayActs.some((a) => a.prescribedById);
 
               return (
                 <button
@@ -71,11 +77,18 @@ export default function WeekCalendar({
                     >
                       {date.getDate()}
                     </span>
-                    {(byDate[dateKey]?.length ?? 0) > 0 && (
-                      <span className="rounded-full bg-ink-100 px-1.5 py-0.5 text-[10px] text-ink-500">
-                        {byDate[dateKey].length}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {hasCoachPlan && (
+                        <span className="rounded bg-brand-100 px-1 py-0.5 text-[9px] font-bold uppercase text-brand-700">
+                          C
+                        </span>
+                      )}
+                      {dayActs.length > 0 && (
+                        <span className="rounded-full bg-ink-100 px-1.5 py-0.5 text-[10px] text-ink-500">
+                          {dayActs.length}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <DayTotalsDisplay totals={totals} compact />
                 </button>
@@ -92,13 +105,21 @@ export default function WeekCalendar({
         </div>
       </div>
 
-      {selectedDateKey && (
-        <DayDetailPanel
-          dateKey={selectedDateKey}
-          activities={byDate[selectedDateKey] ?? []}
-          onClose={() => setSelectedDateKey(null)}
-        />
-      )}
+      {selectedDateKey &&
+        (coachAthleteId ? (
+          <CoachDayPanel
+            dateKey={selectedDateKey}
+            athleteId={coachAthleteId}
+            activities={byDate[selectedDateKey] ?? []}
+            onClose={() => setSelectedDateKey(null)}
+          />
+        ) : (
+          <DayDetailPanel
+            dateKey={selectedDateKey}
+            activities={byDate[selectedDateKey] ?? []}
+            onClose={() => setSelectedDateKey(null)}
+          />
+        ))}
     </>
   );
 }
