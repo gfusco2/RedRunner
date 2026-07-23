@@ -58,3 +58,19 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   BIKE: "Bike",
   XTRAIN: "X-Train",
 };
+
+export function buildWeekCalendarData(
+  weekDayDates: Date[],
+  activities: Activity[],
+  today: Date
+) {
+  const weekDays = weekDayDates.map(toDateKey);
+  const byDate = groupActivitiesByDate(activities);
+  const dayTotalsList = weekDays.map((key) =>
+    totalsForActivities(byDate[key] ?? [])
+  );
+  const weekTotals = sumTotals(dayTotalsList);
+  const todayKey = toDateKey(today);
+
+  return { weekDays, weekTotals, todayKey };
+}
