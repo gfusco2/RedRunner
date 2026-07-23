@@ -2,10 +2,8 @@
 
 import type { Activity } from "@prisma/client";
 import { useState } from "react";
-import { toDateKey } from "lib/training/dates";
 import {
   groupActivitiesByDate,
-  sumTotals,
   totalsForActivities,
   type DayTotals,
 } from "lib/training/totals";
@@ -101,19 +99,4 @@ export default function WeekCalendar({
       )}
     </>
   );
-}
-
-export function buildWeekCalendarData(
-  weekDayDates: Date[],
-  activities: Activity[],
-  today: Date
-) {
-  const weekDays = weekDayDates.map(toDateKey);
-  const dayTotalsList = weekDays.map((key) =>
-    totalsForActivities(groupActivitiesByDate(activities)[key] ?? [])
-  );
-  const weekTotals = sumTotals(dayTotalsList);
-  const todayKey = toDateKey(today);
-
-  return { weekDays, weekTotals, todayKey };
 }

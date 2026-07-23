@@ -2,17 +2,15 @@
 
 import Link from "next/link";
 import type { Activity } from "@prisma/client";
-import WeekCalendar, { buildWeekCalendarData } from "components/training/WeekCalendar";
-import DayTotalsDisplay from "components/training/DayTotalsDisplay";
+import WeekCalendar from "components/training/WeekCalendar";
 import {
   addWeeks,
   formatWeekLabel,
-  getWeekDays,
   parseDateKey,
   toDateKey,
   getMonday,
 } from "lib/training/dates";
-import { formatDurationLong, formatMiles } from "lib/training/format";
+import { buildWeekCalendarData } from "lib/training/totals";
 
 type TrainingLogViewProps = {
   weekStartKey: string;

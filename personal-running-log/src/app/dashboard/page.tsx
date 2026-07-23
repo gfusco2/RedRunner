@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getCurrentWeekActivities } from "app/actions/activities";
 import DayTotalsDisplay from "components/training/DayTotalsDisplay";
-import WeekCalendar, { buildWeekCalendarData } from "components/training/WeekCalendar";
+import WeekCalendar from "components/training/WeekCalendar";
 import {
   formatWeekLabel,
   getMonday,
@@ -9,7 +9,11 @@ import {
   toDateKey,
 } from "lib/training/dates";
 import { formatDurationLong, formatMiles } from "lib/training/format";
-import { groupActivitiesByDate, totalsForActivities } from "lib/training/totals";
+import {
+  buildWeekCalendarData,
+  groupActivitiesByDate,
+  totalsForActivities,
+} from "lib/training/totals";
 
 export default async function DashboardPage() {
   const today = new Date();
