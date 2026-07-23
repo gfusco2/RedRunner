@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getCurrentWeekActivities } from "app/actions/activities";
+import { getCurrentProfile } from "app/actions/auth";
+import DashboardSummaryCards from "components/dashboard/DashboardSummaryCards";
 import DayTotalsDisplay from "components/training/DayTotalsDisplay";
 import WeekCalendar from "components/training/WeekCalendar";
 import {
@@ -8,7 +10,6 @@ import {
   getWeekDays,
   toDateKey,
 } from "lib/training/dates";
-import { formatDurationLong, formatMiles } from "lib/training/format";
 import {
   buildWeekCalendarData,
   groupActivitiesByDate,
@@ -20,7 +21,10 @@ export default async function DashboardPage() {
   const weekStart = getMonday(today);
   const weekDays = getWeekDays(weekStart);
   const weekStartKey = toDateKey(weekStart);
-  const activities = await getCurrentWeekActivities();
+  const [activities, profile] = await Promise.all([
+    getCurrentWeekActivities(),
+    getCurrentProfile(),
+  ]);
 
   const { weekTotals, todayKey } = buildWeekCalendarData(
     weekDays,
@@ -33,6 +37,14 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
+      {!profile && (
+        <div className="mb-6 rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-ink-700">
+          <Link href="/login" className="font-medium text-brand-600 underline">
+            Sign in
+          </Link>{" "}
+          to see your personal training summary.
+        </div>
+      )}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink-900">
@@ -50,44 +62,7 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <div className="mb-8 grid gap-3 sm:grid-cols-4">
-        <div className="rounded-xl border border-brand-100 bg-brand-50 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
-            Completed miles
-          </p>
-          <p className="mt-1 text-2xl font-semibold text-brand-800">
-            {weekTotals.runMiles > 0
-              ? formatMiles(weekTotals.runMiles)
-              : "0.0 mi"}
-          </p>
-        </div>
-        <div className="rounded-xl border border-brand-100 bg-white p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-brand-400">
-            Planned miles
-          </p>
-          <p className="mt-1 text-2xl font-semibold text-brand-500">
-            {weekTotals.plannedRunMiles > 0
-              ? formatMiles(weekTotals.plannedRunMiles)
-              : "0.0 mi"}
-          </p>
-        </div>
-        <div className="rounded-xl border border-ink-100 bg-white p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-            Bike time
-          </p>
-          <p className="mt-1 text-2xl font-semibold text-ink-900">
-            {formatDurationLong(weekTotals.bikeSeconds)}
-          </p>
-        </div>
-        <div className="rounded-xl border border-ink-100 bg-white p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-            X-Train time
-          </p>
-          <p className="mt-1 text-2xl font-semibold text-ink-900">
-            {formatDurationLong(weekTotals.xtrainSeconds)}
-          </p>
-        </div>
-      </div>
+      <DashboardSummaryCards totals={weekTotals} />
 
       <section className="mb-8">
         <h2 className="mb-3 text-lg font-semibold text-ink-900">

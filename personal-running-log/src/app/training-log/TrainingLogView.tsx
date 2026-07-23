@@ -13,7 +13,7 @@ import {
   parseDateKey,
   toDateKey,
   getMonday,
-  getMultiWeekRange,
+  getPastFourWeekRange,
 } from "lib/training/dates";
 import {
   buildWeekCalendarData,
@@ -38,20 +38,22 @@ export default function TrainingLogView({
   const todayKey = toDateKey(new Date());
 
   const weekStarts = getFourWeekStarts(weekStart);
-  const { end } = getMultiWeekRange(weekStart, 4);
+  const { start: rangeStart, end: rangeEnd } = getPastFourWeekRange(weekStart);
 
-  const weeks: CalendarWeek[] = weekStarts.map((ws, index) => {
+  const weeks: CalendarWeek[] = weekStarts.map((ws) => {
     const days = getWeekDays(ws);
+    const weekKey = toDateKey(ws);
     const { weekDays, weekTotals } = buildWeekCalendarData(
       days,
       activities,
       new Date()
     );
     return {
-      weekStartKey: toDateKey(ws),
+      weekStartKey: weekKey,
       weekDays,
       weekTotals,
-      emphasized: index === 0,
+      // Emphasize the real current week wherever it sits in the stack
+      emphasized: weekKey === currentWeekKey,
     };
   });
 
@@ -69,7 +71,7 @@ export default function TrainingLogView({
             Training Log
           </h1>
           <p className="mt-1 text-sm text-ink-500">
-            {formatRangeLabel(weekStart, end)} · 4 weeks · focus week enlarged
+            {formatRangeLabel(rangeStart, rangeEnd)} · current week highlighted
           </p>
         </div>
         <div className="flex items-center gap-2">

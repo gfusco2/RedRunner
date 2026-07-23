@@ -2,14 +2,21 @@
 
 import type { Activity } from "@prisma/client";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import {
   deleteActivity,
   markActivityCompleted,
 } from "app/actions/activities";
-import { formatDuration, formatMiles } from "lib/training/format";
+import {
+  formatDistance,
+  formatDuration,
+  formatMinSec,
+  formatPaceDisplay,
+  formatScore,
+} from "lib/training/format";
 import { ACTIVITY_LABELS } from "lib/training/totals";
 import { parseDateKey } from "lib/training/dates";
+import { usePreferences } from "lib/preferences";
 import ActivityForm from "./ActivityForm";
 
 type DayDetailPanelProps = {
@@ -18,13 +25,18 @@ type DayDetailPanelProps = {
   onClose: () => void;
 };
 
+const SCORE_OPTIONS = Array.from({ length: 10 }, (_, i) => i + 1);
+
 export default function DayDetailPanel({
   dateKey,
   activities,
   onClose,
 }: DayDetailPanelProps) {
   const router = useRouter();
+  const { unit } = usePreferences();
   const [pending, startTransition] = useTransition();
+  const [completingId, setCompletingId] = useState<number | null>(null);
+  const [completeError, setCompleteError] = useState<string | null>(null);
   const dateLabel = parseDateKey(dateKey).toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -42,10 +54,26 @@ export default function DayDetailPanel({
     });
   }
 
-  function handleComplete(id: number) {
+  function handleComplete(
+    e: React.FormEvent<HTMLFormElement>,
+    id: number
+  ) {
+    e.preventDefault();
+    setCompleteError(null);
+    const formData = new FormData(e.currentTarget);
+    const difficulty = Number(formData.get("difficulty"));
+    const feel = Number(formData.get("feel"));
+
     startTransition(async () => {
-      await markActivityCompleted(id);
-      refresh();
+      try {
+        await markActivityCompleted(id, { difficulty, feel });
+        setCompletingId(null);
+        refresh();
+      } catch (err) {
+        setCompleteError(
+          err instanceof Error ? err.message : "Could not complete workout."
+        );
+      }
     });
   }
 
@@ -67,71 +95,160 @@ export default function DayDetailPanel({
           <section>
             <h3 className="label-field mb-2">Activities</h3>
             {activities.length === 0 ? (
-              <p className="text-sm text-ink-500">Nothing logged yet — add one below.</p>
+              <p className="text-sm text-ink-500">
+                Nothing logged yet — add one below.
+              </p>
             ) : (
               <ul className="divide-y divide-ink-100 overflow-hidden rounded-lg border border-ink-100">
-                {activities.map((activity) => (
-                  <li
-                    key={activity.id}
-                    className="flex items-start justify-between gap-3 px-3 py-2.5"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium text-ink-900">
-                          {activity.name?.trim() || ACTIVITY_LABELS[activity.type]}
-                        </p>
-                        {activity.planned ? (
-                          <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-600">
-                            Planned
-                          </span>
-                        ) : (
-                          <span className="rounded bg-ink-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
-                            Done
-                          </span>
-                        )}
-                        {activity.name?.trim() && (
-                          <span className="text-xs text-ink-500">
-                            {ACTIVITY_LABELS[activity.type]}
-                          </span>
-                        )}
+                {activities.map((activity) => {
+                  const enteredPace =
+                    activity.type === "RUN"
+                      ? formatPaceDisplay(activity.pace_seconds, unit)
+                      : null;
+
+                  return (
+                    <li key={activity.id} className="px-3 py-2.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium text-ink-900">
+                              {activity.name?.trim() ||
+                                ACTIVITY_LABELS[activity.type]}
+                            </p>
+                            {activity.planned ? (
+                              <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-600">
+                                Planned
+                              </span>
+                            ) : (
+                              <span className="rounded bg-ink-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+                                Done
+                              </span>
+                            )}
+                            {activity.name?.trim() && (
+                              <span className="text-xs text-ink-500">
+                                {ACTIVITY_LABELS[activity.type]}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-ink-500">
+                            {activity.type === "RUN" &&
+                              activity.distance_miles != null &&
+                              formatDistance(activity.distance_miles, unit)}
+                            {activity.type !== "RUN" &&
+                              activity.duration_seconds != null &&
+                              formatDuration(activity.duration_seconds)}
+                            {activity.type === "RUN" &&
+                              activity.duration_seconds != null &&
+                              ` · ${formatMinSec(activity.duration_seconds)}`}
+                            {enteredPace && ` · ${enteredPace}`}
+                          </p>
+                          {!activity.planned && (
+                            <p className="mt-0.5 text-xs text-ink-500">
+                              Diff {formatScore(activity.difficulty)} · Feel{" "}
+                              {formatScore(activity.feel)}
+                            </p>
+                          )}
+                          {activity.notes && (
+                            <p className="mt-1 text-xs text-ink-500">
+                              {activity.notes}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          {activity.planned && completingId !== activity.id && (
+                            <button
+                              type="button"
+                              disabled={pending}
+                              onClick={() => {
+                                setCompletingId(activity.id);
+                                setCompleteError(null);
+                              }}
+                              className="text-xs font-medium text-brand-600 hover:text-brand-800 disabled:opacity-50"
+                            >
+                              Mark done
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={pending}
+                            onClick={() => handleDelete(activity.id)}
+                            className="text-xs text-ink-500 hover:text-brand-700 disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
-                      <p className="text-sm text-ink-500">
-                        {activity.type === "RUN" &&
-                          activity.distance_miles != null &&
-                          formatMiles(activity.distance_miles)}
-                        {activity.type !== "RUN" &&
-                          activity.duration_seconds != null &&
-                          formatDuration(activity.duration_seconds)}
-                        {activity.type === "RUN" &&
-                          activity.duration_seconds != null &&
-                          ` · ${formatDuration(activity.duration_seconds)}`}
-                      </p>
-                      {activity.notes && (
-                        <p className="mt-1 text-xs text-ink-500">{activity.notes}</p>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      {activity.planned && (
-                        <button
-                          type="button"
-                          disabled={pending}
-                          onClick={() => handleComplete(activity.id)}
-                          className="text-xs font-medium text-brand-600 hover:text-brand-800 disabled:opacity-50"
+
+                      {activity.planned && completingId === activity.id && (
+                        <form
+                          onSubmit={(e) => handleComplete(e, activity.id)}
+                          className="mt-3 space-y-2 rounded-lg border border-brand-100 bg-brand-50/50 p-3"
                         >
-                          Mark done
-                        </button>
+                          <p className="text-xs font-medium text-ink-700">
+                            Rate this workout to mark it complete
+                          </p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="label-field">Difficulty</label>
+                              <select
+                                name="difficulty"
+                                required
+                                className="input-field"
+                                defaultValue=""
+                              >
+                                <option value="" disabled>
+                                  1–10
+                                </option>
+                                {SCORE_OPTIONS.map((n) => (
+                                  <option key={n} value={n}>
+                                    {n}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="label-field">Feel</label>
+                              <select
+                                name="feel"
+                                required
+                                className="input-field"
+                                defaultValue=""
+                              >
+                                <option value="" disabled>
+                                  1–10
+                                </option>
+                                {SCORE_OPTIONS.map((n) => (
+                                  <option key={n} value={n}>
+                                    {n}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          {completeError && (
+                            <p className="text-xs text-brand-600">{completeError}</p>
+                          )}
+                          <div className="flex gap-2">
+                            <button
+                              type="submit"
+                              disabled={pending}
+                              className="btn-primary flex-1"
+                            >
+                              {pending ? "Saving…" : "Complete"}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-ghost"
+                              onClick={() => setCompletingId(null)}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
                       )}
-                      <button
-                        type="button"
-                        disabled={pending}
-                        onClick={() => handleDelete(activity.id)}
-                        className="text-xs text-ink-500 hover:text-brand-700 disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
