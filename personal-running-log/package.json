@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "next dev",
@@ -15,11 +15,11 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
-    "@prisma/client": "^3.6.0",
+    "@prisma/client": "6.19.2",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.8",
     "next": "latest",
-    "prisma": "^3.6.0",
+    "prisma": "6.19.2",
     "react": "latest",
     "react-dom": "latest",
     "tailwindcss": "^2.2.19"
@@ -29,7 +29,7 @@
     "@types/react": "19.2.17",
     "eslint": "^7.32.0",
     "eslint-config-next": "^12.0.7",
-    "typescript": "^4.5.4"
+    "typescript": "5.9.3"
   },
   "description": "A personal training log built with Next.js (App Router), Tailwind CSS, and Prisma ORM. Data access is Prisma-only against a Supabase-hosted PostgreSQL database. Track runs, bike sessions, and cross-training.",
   "main": "next.config.js",
