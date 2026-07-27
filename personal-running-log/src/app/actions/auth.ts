@@ -51,6 +51,15 @@ export async function getCurrentProfile(): Promise<User | null> {
       (await ensureProfile())
     );
   } catch (err) {
+    // Let Next.js handle static-generation / cookies boundary errors.
+    if (
+      err instanceof Error &&
+      (err.message.includes("Dynamic server usage") ||
+        // @ts-expect-error Next digest
+        err.digest === "DYNAMIC_SERVER_USAGE")
+    ) {
+      throw err;
+    }
     console.error("getCurrentProfile failed", err);
     return null;
   }
