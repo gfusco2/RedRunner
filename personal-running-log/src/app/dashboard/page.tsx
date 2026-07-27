@@ -21,6 +21,7 @@ import {
   getMonday,
   getWeekDays,
   getWeekRange,
+  parseDateKey,
   toDateKey,
 } from "lib/training/dates";
 import {
@@ -39,22 +40,44 @@ import {
   totalsForActivities,
 } from "lib/training/totals";
 
-export default async function DashboardPage() {
+type PageProps = {
+  searchParams: Promise<{ week?: string }>;
+};
+
+export default async function DashboardPage({ searchParams }: PageProps) {
+  const { week } = await searchParams;
   const today = new Date();
-  const weekStart = getMonday(today);
+  const currentWeekKey = toDateKey(getMonday(today));
+  const weekStart = week
+    ? getMonday(parseDateKey(week))
+    : getMonday(today);
+  const weekStartKey = toDateKey(weekStart);
   const lastWeekStart = addWeeks(weekStart, -1);
   const weekDays = getWeekDays(weekStart);
-  const weekStartKey = toDateKey(weekStart);
+  const { end: weekEnd } = getWeekRange(weekStart);
+  const weekEndKey = toDateKey(weekEnd);
 
-  const historyStart = addWeeks(weekStart, -11);
-  const historyStartKey = toDateKey(historyStart);
-  const { end: historyEnd } = getWeekRange(weekStart);
-  const historyEndKey = toDateKey(historyEnd);
+  const prevWeekKey = toDateKey(addWeeks(weekStart, -1));
+  const nextWeekKey = toDateKey(addWeeks(weekStart, 1));
+
+  // Enough history for the viewed week, prior week compare, and (when current) the chart
+  const fetchStart = addWeeks(
+    weekStart.getTime() < getMonday(today).getTime()
+      ? weekStart
+      : getMonday(today),
+    -11
+  );
+  const fetchStartKey = toDateKey(fetchStart);
+  const fetchEnd =
+    weekEnd.getTime() > getWeekRange(getMonday(today)).end.getTime()
+      ? weekEnd
+      : getWeekRange(getMonday(today)).end;
+  const fetchEndKey = toDateKey(fetchEnd);
 
   const blockKeys = weekKeysForward(weekStartKey, 4);
   const blockEndKey = blockKeys[blockKeys.length - 1];
-
-  const rollingStartKey = toDateKey(addWeeks(weekStart, -8));
+  const rollingStartKey = toDateKey(addWeeks(getMonday(today), -8));
+  const chartEndKey = toDateKey(today);
 
   const [
     profile,
@@ -65,16 +88,16 @@ export default async function DashboardPage() {
     wellness,
   ] = await Promise.all([
     getCurrentProfile(),
-    getActivitiesInRange(historyStartKey, historyEndKey),
+    getActivitiesInRange(fetchStartKey, fetchEndKey),
     getWeekPlan(weekStartKey),
     getWeekPlansInRange(weekStartKey, blockEndKey),
-    getWeekPlansInRange(rollingStartKey, weekStartKey),
-    getWellnessForRange(weekStartKey, historyEndKey),
+    getWeekPlansInRange(rollingStartKey, currentWeekKey),
+    getWellnessForRange(weekStartKey, weekEndKey),
   ]);
 
   const thisWeekActivities = historyActivities.filter((a) => {
     const t = new Date(a.date).getTime();
-    return t >= weekStart.getTime() && t < historyEnd.getTime();
+    return t >= weekStart.getTime() && t < weekEnd.getTime();
   });
   const lastWeekEnd = weekStart;
   const lastWeekActivities = historyActivities.filter((a) => {
@@ -94,12 +117,12 @@ export default async function DashboardPage() {
   const rolling = buildRolling7DaySeries(
     historyActivities,
     rollingStartKey,
-    toDateKey(today)
+    chartEndKey
   );
   const goalBands = chartBandsFromPlans(
     chartPlans,
     rollingStartKey,
-    toDateKey(today)
+    chartEndKey
   );
   const tagMiles = milesByTag(thisWeekActivities);
   const thisGoal = goalBand(weekPlan?.goalRunMiles, weekPlan?.goalRangeMiles);
@@ -107,9 +130,12 @@ export default async function DashboardPage() {
   const wellnessDone = wellness.filter(
     (w) => w.strengthDone || w.stretchDone
   ).length;
+  const viewingCurrent = weekStartKey === currentWeekKey;
+  const weekHref = (key: string) =>
+    key === currentWeekKey ? "/dashboard" : `/dashboard?week=${key}`;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
       {!profile && (
         <div className="mb-6 rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-ink-700">
           <Link href="/login" className="font-medium text-brand-600 underline">
@@ -118,36 +144,54 @@ export default async function DashboardPage() {
           to see your personal training summary.
         </div>
       )}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+
+      <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-ink-900">
+          <h1 className="text-xl font-semibold tracking-tight text-ink-900 sm:text-2xl">
             Dashboard
           </h1>
           <p className="mt-1 text-sm text-ink-500">
-            Current week · {formatWeekLabel(weekStart)}
+            {viewingCurrent ? "This week" : "Week of"} ·{" "}
+            {formatWeekLabel(weekStart)}
             {wellnessDone > 0
               ? ` · ${wellnessDone} wellness day${wellnessDone === 1 ? "" : "s"}`
               : ""}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/reports" className="btn-ghost">
-            Reports
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={weekHref(prevWeekKey)}
+            className="btn-ghost min-h-[40px] px-3"
+          >
+            ← Prev
+          </Link>
+          {!viewingCurrent && (
+            <Link href="/dashboard" className="btn-ghost min-h-[40px] px-3">
+              Today
+            </Link>
+          )}
+          <Link
+            href={weekHref(nextWeekKey)}
+            className="btn-ghost min-h-[40px] px-3"
+          >
+            Next →
           </Link>
           <Link
             href={`/training-log?week=${weekStartKey}`}
-            className="btn-primary"
+            className="btn-primary min-h-[40px]"
           >
-            Open Training Log
+            Training Log
           </Link>
         </div>
       </div>
 
       <DashboardSummaryCards totals={weekTotals} goal={thisGoal} />
 
-      <div className="mb-8">
-        <RollingMileageChart points={rolling} goalBands={goalBands} />
-      </div>
+      {viewingCurrent && (
+        <div className="mb-8">
+          <RollingMileageChart points={rolling} goalBands={goalBands} />
+        </div>
+      )}
 
       <div className="mb-8">
         <WeekCompareCards
@@ -173,7 +217,7 @@ export default async function DashboardPage() {
 
       <section className="mb-8">
         <h2 className="mb-3 text-lg font-semibold text-ink-900">
-          This week at a glance
+          Week at a glance
         </h2>
         <WeekCalendar
           weekDays={weekDayKeys}
@@ -200,14 +244,14 @@ export default async function DashboardPage() {
             return (
               <div
                 key={dateKey}
-                className={`flex items-center justify-between px-4 py-3 ${
+                className={`flex items-center justify-between gap-3 px-4 py-3 ${
                   isToday ? "bg-brand-50" : ""
                 }`}
               >
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium text-ink-900">
                     {date.toLocaleDateString("en-US", {
-                      weekday: "long",
+                      weekday: "short",
                       month: "short",
                       day: "numeric",
                     })}

@@ -3,9 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import type { ActivityWithDetails } from "app/actions/activities";
-import {
-  deleteActivity,
-} from "app/actions/activities";
+import { deleteActivity } from "app/actions/activities";
 import {
   formatDistance,
   formatDuration,
@@ -39,7 +37,11 @@ export default function DayDetailPanel({
   const router = useRouter();
   const { unit } = usePreferences();
   const [pending, startTransition] = useTransition();
-  const [completingId, setCompletingId] = useState<number | null>(null);
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [activeMode, setActiveMode] = useState<"complete" | "edit" | null>(
+    null
+  );
+  const [showAdd, setShowAdd] = useState(activities.length === 0);
   const dateLabel = parseDateKey(dateKey).toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -59,10 +61,25 @@ export default function DayDetailPanel({
   }
 
   function handleDelete(id: number) {
+    if (!window.confirm("Remove this activity?")) return;
     startTransition(async () => {
       await deleteActivity(id);
+      if (activeId === id) {
+        setActiveId(null);
+        setActiveMode(null);
+      }
       refresh();
     });
+  }
+
+  function openForm(id: number, mode: "complete" | "edit") {
+    setActiveId(id);
+    setActiveMode(mode);
+  }
+
+  function closeForm() {
+    setActiveId(null);
+    setActiveMode(null);
   }
 
   return (
@@ -74,7 +91,7 @@ export default function DayDetailPanel({
     >
       <div
         className="flex w-full max-w-lg flex-col overflow-hidden rounded-t-xl bg-white shadow-soft sm:rounded-xl"
-        style={{ height: "min(90dvh, 900px)", maxHeight: "90dvh" }}
+        style={{ height: "min(92dvh, 920px)", maxHeight: "92dvh" }}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-ink-100 bg-white px-4 py-3">
           <div>
@@ -86,7 +103,7 @@ export default function DayDetailPanel({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-ink-200 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-ink-50"
+            className="rounded-md border border-ink-200 bg-white px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50"
           >
             Close
           </button>
@@ -97,10 +114,10 @@ export default function DayDetailPanel({
           style={{ minHeight: 0, WebkitOverflowScrolling: "touch" }}
         >
           <section className="mb-5">
-            <h3 className="label-field mb-2">Logged today</h3>
+            <h3 className="label-field mb-2">Activities</h3>
             {activities.length === 0 ? (
               <p className="rounded-lg border border-dashed border-ink-200 bg-ink-50 px-3 py-4 text-sm text-ink-500">
-                Nothing logged yet — add one below.
+                Nothing yet — add one below.
               </p>
             ) : (
               <ul className="space-y-2">
@@ -109,6 +126,8 @@ export default function DayDetailPanel({
                     activity.type === "RUN"
                       ? formatPaceDisplay(activity.pace_seconds, unit)
                       : null;
+                  const formOpen =
+                    activeId === activity.id && activeMode != null;
 
                   return (
                     <li
@@ -208,8 +227,16 @@ export default function DayDetailPanel({
                                   split.label || "Rep",
                                 ];
                                 if (split.distance_miles != null) {
+                                  const meters = Math.round(
+                                    split.distance_miles * 1609.34
+                                  );
                                   bits.push(
-                                    formatDistance(split.distance_miles, unit)
+                                    meters >= 100 && meters % 100 === 0
+                                      ? `${meters}m`
+                                      : formatDistance(
+                                          split.distance_miles,
+                                          unit
+                                        )
                                   );
                                 }
                                 if (split.duration_seconds != null) {
@@ -232,15 +259,25 @@ export default function DayDetailPanel({
                             </p>
                           )}
                         </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          {activity.planned && completingId !== activity.id && (
+                        <div className="flex shrink-0 flex-col items-end gap-1.5">
+                          {activity.planned && !formOpen && (
                             <button
                               type="button"
                               disabled={pending}
-                              onClick={() => setCompletingId(activity.id)}
+                              onClick={() => openForm(activity.id, "complete")}
                               className="text-xs font-semibold text-brand-600 hover:text-brand-800 disabled:opacity-50"
                             >
                               Mark done
+                            </button>
+                          )}
+                          {!activity.planned && !formOpen && (
+                            <button
+                              type="button"
+                              disabled={pending}
+                              onClick={() => openForm(activity.id, "edit")}
+                              className="text-xs font-semibold text-brand-600 hover:text-brand-800 disabled:opacity-50"
+                            >
+                              Edit
                             </button>
                           )}
                           <button
@@ -254,14 +291,16 @@ export default function DayDetailPanel({
                         </div>
                       </div>
 
-                      {activity.planned && completingId === activity.id && (
+                      {formOpen && activeMode && (
                         <CompleteWorkoutForm
+                          key={`${activity.id}-${activeMode}`}
                           activity={activity}
+                          mode={activeMode}
                           onDone={() => {
-                            setCompletingId(null);
+                            closeForm();
                             refresh();
                           }}
-                          onCancel={() => setCompletingId(null)}
+                          onCancel={closeForm}
                         />
                       )}
                     </li>
@@ -276,8 +315,27 @@ export default function DayDetailPanel({
           </section>
 
           <section className="rounded-xl border border-ink-100 bg-ink-50 p-3">
-            <h3 className="mb-3 text-sm font-bold text-ink-900">Add activity</h3>
-            <ActivityForm dateKey={dateKey} onSuccess={refresh} />
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-ink-900">Add activity</h3>
+              {activities.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAdd((v) => !v)}
+                  className="text-xs font-semibold text-brand-600"
+                >
+                  {showAdd ? "Hide" : "Show"}
+                </button>
+              )}
+            </div>
+            {showAdd && (
+              <ActivityForm
+                dateKey={dateKey}
+                onSuccess={() => {
+                  setShowAdd(false);
+                  refresh();
+                }}
+              />
+            )}
           </section>
         </div>
       </div>

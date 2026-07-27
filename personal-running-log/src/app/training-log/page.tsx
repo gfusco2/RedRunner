@@ -42,6 +42,7 @@ export default async function TrainingLogPage({ searchParams }: PageProps) {
         weekStartKey={weekStartKey}
         activities={activities}
         plansByWeek={plansByWeekKey(weekPlans)}
+        canEditGoals={Boolean(profile)}
       />
     </div>
   );
