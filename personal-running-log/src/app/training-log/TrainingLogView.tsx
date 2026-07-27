@@ -6,9 +6,11 @@ import type { WeekPlan } from "@prisma/client";
 import MonthCalendar, {
   type CalendarWeek,
 } from "components/training/MonthCalendar";
+import WeekGoalEditor from "components/dashboard/WeekGoalEditor";
 import {
   addWeeks,
   formatRangeLabel,
+  formatWeekLabel,
   getFourWeekStarts,
   getWeekDays,
   parseDateKey,
@@ -28,12 +30,14 @@ type TrainingLogViewProps = {
   weekStartKey: string;
   activities: ActivityWithDetails[];
   plansByWeek: Record<string, WeekPlan>;
+  canEditGoals?: boolean;
 };
 
 export default function TrainingLogView({
   weekStartKey,
   activities,
   plansByWeek,
+  canEditGoals = false,
 }: TrainingLogViewProps) {
   const weekStart = parseDateKey(weekStartKey);
   const prevWeekKey = toDateKey(addWeeks(weekStart, -1));
@@ -68,46 +72,72 @@ export default function TrainingLogView({
     allDayKeys.map((key) => totalsForActivities(byDate[key] ?? []))
   );
 
-  const focusGoal =
-    weeks.find((w) => w.emphasized)?.goal ??
-    goalBand(
-      plansByWeek[currentWeekKey]?.goalRunMiles,
-      plansByWeek[currentWeekKey]?.goalRangeMiles
-    );
+  // Summary goal follows the week you're browsing (top of stack / URL week)
+  const focusPlan = plansByWeek[weekStartKey] ?? null;
+  const focusGoal = goalBand(
+    focusPlan?.goalRunMiles,
+    focusPlan?.goalRangeMiles
+  );
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+      <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-ink-900">
+          <h1 className="text-xl font-semibold tracking-tight text-ink-900 sm:text-2xl">
             Training Log
           </h1>
           <p className="mt-1 text-sm text-ink-500">
-            {formatRangeLabel(rangeStart, rangeEnd)} · current week highlighted
+            {formatRangeLabel(rangeStart, rangeEnd)}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href={`/training-log?week=${prevWeekKey}`} className="btn-ghost">
+          <Link
+            href={`/training-log?week=${prevWeekKey}`}
+            className="btn-ghost min-h-[40px] flex-1 px-3 text-center sm:flex-none"
+          >
             ← Prev
           </Link>
           {weekStartKey !== currentWeekKey && (
             <Link
               href={`/training-log?week=${currentWeekKey}`}
-              className="btn-ghost"
+              className="btn-ghost min-h-[40px] flex-1 px-3 text-center sm:flex-none"
             >
-              This week
+              Today
             </Link>
           )}
-          <Link href={`/training-log?week=${nextWeekKey}`} className="btn-ghost">
+          <Link
+            href={`/training-log?week=${nextWeekKey}`}
+            className="btn-ghost min-h-[40px] flex-1 px-3 text-center sm:flex-none"
+          >
             Next →
           </Link>
         </div>
       </div>
 
-      <p className="mb-5 text-sm text-ink-500">
-        Click a day to log or plan. Goal is the weekly target; planned miles are
-        what you’ve written on the calendar.
+      <p className="mb-4 hidden text-sm text-ink-500 sm:block">
+        Click a day to log or plan. Set a weekly goal on any week — including
+        far ahead — then fill workouts when ready.
       </p>
+
+      {canEditGoals && (
+        <div className="mb-4 rounded-xl border border-ink-100 bg-white p-3 shadow-soft sm:mb-5 sm:p-4">
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold text-ink-900">
+              Goal for {formatWeekLabel(weekStart)}
+            </h2>
+            {weekStartKey !== currentWeekKey && (
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-brand-600">
+                Ahead
+              </span>
+            )}
+          </div>
+          <WeekGoalEditor
+            weekStartKey={weekStartKey}
+            initial={focusPlan}
+            compact
+          />
+        </div>
+      )}
 
       <MonthCalendar
         weeks={weeks}
@@ -115,6 +145,8 @@ export default function TrainingLogView({
         todayKey={todayKey}
         periodTotals={periodTotals}
         focusGoal={focusGoal}
+        plansByWeek={plansByWeek}
+        canEditGoals={canEditGoals}
       />
     </div>
   );

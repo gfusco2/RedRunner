@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import type { ActivityWithDetails } from "app/actions/activities";
-import { markActivityCompleted } from "app/actions/activities";
+import {
+  markActivityCompleted,
+  updateActivity,
+} from "app/actions/activities";
 import {
   formatDistance,
   formatMinSec,
@@ -15,6 +18,7 @@ import { SEGMENT_KIND_SHORT } from "lib/training/tags";
 
 type Props = {
   activity: ActivityWithDetails;
+  mode?: "complete" | "edit";
   onDone: () => void;
   onCancel: () => void;
 };
@@ -22,13 +26,17 @@ type Props = {
 type SplitRow = {
   key: string;
   label: string;
+  /** Distance in the active split unit (mi or meters). */
   dist: string;
   min: string;
   sec: string;
   restSec: string;
 };
 
+type SplitDistUnit = "mi" | "m";
+
 const SCORE_OPTIONS = Array.from({ length: 10 }, (_, i) => i + 1);
+const METERS_PER_MILE = 1609.34;
 
 const compact =
   "w-14 rounded-md border border-ink-200 bg-white px-2 py-1.5 text-center text-sm text-ink-900 outline-none focus:border-brand-500";
@@ -42,7 +50,10 @@ function milesDisplay(
   return String(Number(miles.toFixed(2)));
 }
 
-function secParts(total: number | null | undefined): { min: string; sec: string } {
+function secParts(total: number | null | undefined): {
+  min: string;
+  sec: string;
+} {
   if (total == null || total <= 0) return { min: "", sec: "" };
   return {
     min: String(Math.floor(total / 60)),
@@ -50,8 +61,14 @@ function secParts(total: number | null | undefined): { min: string; sec: string 
   };
 }
 
+function milesToSplitDist(miles: number, splitUnit: SplitDistUnit): string {
+  if (splitUnit === "m") return String(Math.round(miles * METERS_PER_MILE));
+  return String(Number(miles.toFixed(3)));
+}
+
 export default function CompleteWorkoutForm({
   activity,
+  mode = "complete",
   onDone,
   onCancel,
 }: Props) {
@@ -59,13 +76,15 @@ export default function CompleteWorkoutForm({
   const unitLabel = unit === "km" ? "km" : "mi";
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const main = activity.segments.find((s) => s.kind === "MAIN");
   const wu = activity.segments.find((s) => s.kind === "WU");
   const cd = activity.segments.find((s) => s.kind === "CD");
+  const isEdit = mode === "edit";
 
   const [name, setName] = useState(activity.name ?? "");
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(activity.notes ?? "");
   const [includeWu, setIncludeWu] = useState(Boolean(wu));
   const [includeCd, setIncludeCd] = useState(Boolean(cd));
   const [wuDist, setWuDist] = useState(milesDisplay(wu?.distance_miles, unit));
@@ -76,12 +95,44 @@ export default function CompleteWorkoutForm({
   const mainPace = secParts(main?.pace_seconds);
   const [paceMin, setPaceMin] = useState(mainPace.min);
   const [paceSec, setPaceSec] = useState(mainPace.sec);
-  const [splits, setSplits] = useState<SplitRow[]>([]);
+  const [splitUnit, setSplitUnit] = useState<SplitDistUnit>("m");
+  const [splits, setSplits] = useState<SplitRow[]>(() =>
+    (activity.splits ?? []).map((s, i) => {
+      const t = secParts(s.duration_seconds);
+      return {
+        key: `existing-${s.id}`,
+        label: s.label || `Rep ${i + 1}`,
+        dist:
+          s.distance_miles != null
+            ? milesToSplitDist(s.distance_miles, "m")
+            : "",
+        min: t.min,
+        sec: t.sec,
+        restSec:
+          s.rest_seconds != null ? String(s.rest_seconds) : "",
+      };
+    })
+  );
+  const [quickCount, setQuickCount] = useState("6");
+  const [quickMeters, setQuickMeters] = useState("800");
+  const [quickRest, setQuickRest] = useState("60");
+
+  useEffect(() => {
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, []);
 
   function toMiles(raw: string): number | null {
     if (!raw.trim()) return null;
     const n = Number(raw);
     if (!Number.isFinite(n) || n <= 0) return null;
+    return unit === "km" ? kmToMiles(n) : n;
+  }
+
+  function splitDistToMiles(raw: string): number | null {
+    if (!raw.trim()) return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    if (splitUnit === "m") return n / METERS_PER_MILE;
     return unit === "km" ? kmToMiles(n) : n;
   }
 
@@ -97,6 +148,26 @@ export default function CompleteWorkoutForm({
         restSec: "",
       },
     ]);
+  }
+
+  function addQuickSplits() {
+    const count = Math.min(20, Math.max(1, Math.round(Number(quickCount) || 0)));
+    const meters = Number(quickMeters);
+    const rest = quickRest.trim() ? String(Math.round(Number(quickRest))) : "";
+    if (!count) return;
+    setSplitUnit("m");
+    const dist =
+      Number.isFinite(meters) && meters > 0 ? String(Math.round(meters)) : "";
+    setSplits(
+      Array.from({ length: count }, (_, i) => ({
+        key: `quick-${Date.now()}-${i}`,
+        label: `Rep ${i + 1}`,
+        dist,
+        min: "",
+        sec: "",
+        restSec: rest,
+      }))
+    );
   }
 
   function updateSplit(key: string, patch: Partial<SplitRow>) {
@@ -155,25 +226,31 @@ export default function CompleteWorkoutForm({
 
         const splitInputs = splits.map((row) => ({
           label: row.label || null,
-          distance_miles: toMiles(row.dist),
+          distance_miles: splitDistToMiles(row.dist),
           duration_seconds: parseMinSec(row.min, row.sec),
           rest_seconds: row.restSec.trim()
             ? Math.round(Number(row.restSec))
             : null,
         }));
 
-        await markActivityCompleted(activity.id, {
+        const payload = {
           difficulty,
           feel,
           name: name.trim() || null,
           notes: notes.trim() || null,
           segments,
           splits: splitInputs,
-        });
+        };
+
+        if (isEdit) {
+          await updateActivity(activity.id, payload);
+        } else {
+          await markActivityCompleted(activity.id, payload);
+        }
         onDone();
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Could not complete workout."
+          err instanceof Error ? err.message : "Could not save workout."
         );
       }
     });
@@ -181,19 +258,22 @@ export default function CompleteWorkoutForm({
 
   return (
     <form
+      ref={formRef}
       onSubmit={handleSubmit}
       className="mt-3 space-y-3 rounded-lg border border-brand-200 bg-brand-50 p-3"
     >
       <div>
         <p className="text-xs font-semibold text-brand-800">
-          Log what you actually did
+          {isEdit ? "Edit workout report" : "Log what you actually did"}
         </p>
         <p className="mt-0.5 text-[11px] text-brand-700">
-          The plan is a guide — adjust distances, add notes, and record splits.
+          {isEdit
+            ? "Update distances, notes, splits, and how it felt."
+            : "The plan is a guide — adjust distances, add notes, and record splits."}
         </p>
       </div>
 
-      {activity.segments.length > 0 && (
+      {!isEdit && activity.segments.length > 0 && (
         <div className="rounded-md border border-brand-100 bg-white px-2.5 py-2">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">
             Prescribed
@@ -235,7 +315,7 @@ export default function CompleteWorkoutForm({
           <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
             Actual segments ({unitLabel})
           </p>
-          <label className="flex items-center gap-2 text-xs text-ink-700">
+          <label className="flex flex-wrap items-center gap-2 text-xs text-ink-700">
             <input
               type="checkbox"
               checked={includeWu}
@@ -279,7 +359,7 @@ export default function CompleteWorkoutForm({
               inputMode="numeric"
             />
           </div>
-          <label className="flex items-center gap-2 text-xs text-ink-700">
+          <label className="flex flex-wrap items-center gap-2 text-xs text-ink-700">
             <input
               type="checkbox"
               checked={includeCd}
@@ -311,21 +391,87 @@ export default function CompleteWorkoutForm({
       </div>
 
       <div className="rounded-md border border-ink-100 bg-white p-2.5">
-        <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
             Splits / reps
           </p>
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-md border border-ink-200 p-0.5 text-[10px] font-semibold">
+              <button
+                type="button"
+                onClick={() => setSplitUnit("m")}
+                className={`rounded px-1.5 py-0.5 ${
+                  splitUnit === "m"
+                    ? "bg-brand-600 text-white"
+                    : "text-ink-500"
+                }`}
+              >
+                meters
+              </button>
+              <button
+                type="button"
+                onClick={() => setSplitUnit("mi")}
+                className={`rounded px-1.5 py-0.5 ${
+                  splitUnit === "mi"
+                    ? "bg-brand-600 text-white"
+                    : "text-ink-500"
+                }`}
+              >
+                {unitLabel}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={addSplit}
+              className="text-xs font-semibold text-brand-600 hover:text-brand-800"
+            >
+              + Add
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-3 flex flex-wrap items-end gap-2 rounded-md bg-ink-50 p-2">
+          <div>
+            <label className="label-field">Quick set</label>
+            <div className="flex items-center gap-1 text-xs">
+              <input
+                className={compact}
+                value={quickCount}
+                onChange={(e) => setQuickCount(e.target.value)}
+                inputMode="numeric"
+                aria-label="Rep count"
+              />
+              <span className="text-ink-400">×</span>
+              <input
+                className={compact}
+                value={quickMeters}
+                onChange={(e) => setQuickMeters(e.target.value)}
+                inputMode="numeric"
+                aria-label="Meters per rep"
+              />
+              <span className="text-ink-400">m</span>
+              <input
+                className={compact}
+                value={quickRest}
+                onChange={(e) => setQuickRest(e.target.value)}
+                inputMode="numeric"
+                aria-label="Rest seconds"
+              />
+              <span className="text-ink-400">s rest</span>
+            </div>
+          </div>
           <button
             type="button"
-            onClick={addSplit}
-            className="text-xs font-semibold text-brand-600 hover:text-brand-800"
+            onClick={addQuickSplits}
+            className="btn-ghost text-xs"
           >
-            + Add split
+            Fill splits
           </button>
         </div>
+
         {splits.length === 0 ? (
           <p className="text-[11px] text-ink-400">
-            Optional — add each rep time (and rest) for the main set.
+            Optional — use quick set for 6×800, then fill times.
           </p>
         ) : (
           <ul className="space-y-2">
@@ -335,7 +481,7 @@ export default function CompleteWorkoutForm({
                 className="flex flex-wrap items-center gap-1.5 text-xs"
               >
                 <input
-                  className="w-16 rounded-md border border-ink-200 px-1.5 py-1"
+                  className="w-16 rounded-md border border-ink-200 px-1.5 py-1.5"
                   value={row.label}
                   onChange={(e) =>
                     updateSplit(row.key, { label: e.target.value })
@@ -348,9 +494,10 @@ export default function CompleteWorkoutForm({
                   onChange={(e) =>
                     updateSplit(row.key, { dist: e.target.value })
                   }
-                  placeholder={unitLabel}
+                  placeholder={splitUnit === "m" ? "800" : unitLabel}
                   inputMode="decimal"
                 />
+                <span className="text-ink-400">{splitUnit}</span>
                 <input
                   className={compact}
                   value={row.min}
@@ -370,7 +517,7 @@ export default function CompleteWorkoutForm({
                   placeholder="ss"
                   inputMode="numeric"
                 />
-                <span className="text-ink-400">rest s</span>
+                <span className="text-ink-400">rest</span>
                 <input
                   className={compact}
                   value={row.restSec}
@@ -383,7 +530,8 @@ export default function CompleteWorkoutForm({
                 <button
                   type="button"
                   onClick={() => removeSplit(row.key)}
-                  className="text-ink-400 hover:text-brand-700"
+                  className="px-1 text-ink-400 hover:text-brand-700"
+                  aria-label="Remove split"
                 >
                   ×
                 </button>
@@ -400,7 +548,7 @@ export default function CompleteWorkoutForm({
             name="difficulty"
             required
             className="input-field"
-            defaultValue=""
+            defaultValue={activity.difficulty ?? ""}
           >
             <option value="" disabled>
               1–10
@@ -414,7 +562,12 @@ export default function CompleteWorkoutForm({
         </div>
         <div>
           <label className="label-field">Feel</label>
-          <select name="feel" required className="input-field" defaultValue="">
+          <select
+            name="feel"
+            required
+            className="input-field"
+            defaultValue={activity.feel ?? ""}
+          >
             <option value="" disabled>
               1–10
             </option>
@@ -431,7 +584,11 @@ export default function CompleteWorkoutForm({
 
       <div className="flex gap-2">
         <button type="submit" disabled={pending} className="btn-primary flex-1">
-          {pending ? "Saving…" : "Save as completed"}
+          {pending
+            ? "Saving…"
+            : isEdit
+              ? "Save changes"
+              : "Save as completed"}
         </button>
         <button type="button" className="btn-ghost" onClick={onCancel}>
           Cancel

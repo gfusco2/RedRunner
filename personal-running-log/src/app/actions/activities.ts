@@ -371,6 +371,24 @@ export async function markActivityCompleted(
   id: number,
   input: CompleteActivityInput
 ) {
+  return applyActivityReport(id, input, { complete: true });
+}
+
+/**
+ * Edit an owned activity (planned or completed): notes, segments, splits, scores.
+ */
+export async function updateActivity(
+  id: number,
+  input: CompleteActivityInput
+) {
+  return applyActivityReport(id, input, { complete: false });
+}
+
+async function applyActivityReport(
+  id: number,
+  input: CompleteActivityInput,
+  opts: { complete: boolean }
+) {
   const userId = await requireUserId();
   const existing = await prisma.activity.findFirst({
     where: { id, userId },
@@ -379,17 +397,29 @@ export async function markActivityCompleted(
   if (!existing) {
     throw new Error("Activity not found.");
   }
-  if (!existing.planned) {
+  if (opts.complete && !existing.planned) {
     return existing;
   }
 
-  const difficulty = assertScore("Difficulty", input.difficulty, true);
-  const feel = assertScore("Feel", input.feel, true);
+  const difficulty = assertScore(
+    "Difficulty",
+    input.difficulty,
+    opts.complete || !existing.planned
+  );
+  const feel = assertScore(
+    "Feel",
+    input.feel,
+    opts.complete || !existing.planned
+  );
 
   let segmentRows: SegmentInput[] | null = null;
   let distance_miles = existing.distance_miles;
   let duration_seconds = existing.duration_seconds;
   let pace_seconds = existing.pace_seconds;
+  const previousMiles =
+    existing.type === "RUN" && !existing.planned
+      ? existing.distance_miles ?? 0
+      : 0;
 
   if (existing.type === "RUN" && input.segments && input.segments.length > 0) {
     segmentRows = buildRunSegments({
@@ -450,9 +480,9 @@ export async function markActivityCompleted(
   const updated = await prisma.activity.update({
     where: { id },
     data: {
-      planned: false,
-      difficulty,
-      feel,
+      planned: opts.complete ? false : existing.planned,
+      difficulty: difficulty ?? existing.difficulty,
+      feel: feel ?? existing.feel,
       notes:
         input.notes !== undefined
           ? input.notes?.trim() || null
@@ -468,11 +498,26 @@ export async function markActivityCompleted(
     include: activityInclude,
   });
 
-  if (updated.type === "RUN" && updated.shoeId && updated.distance_miles) {
-    await prisma.shoe.update({
-      where: { id: updated.shoeId },
-      data: { total_miles: { increment: updated.distance_miles } },
-    });
+  if (
+    updated.type === "RUN" &&
+    updated.shoeId &&
+    updated.distance_miles
+  ) {
+    if (opts.complete && existing.planned) {
+      await prisma.shoe.update({
+        where: { id: updated.shoeId },
+        data: { total_miles: { increment: updated.distance_miles } },
+      });
+    } else if (!existing.planned) {
+      const nextMiles = updated.distance_miles ?? 0;
+      const delta = nextMiles - previousMiles;
+      if (Math.abs(delta) > 0.0001) {
+        await prisma.shoe.update({
+          where: { id: updated.shoeId },
+          data: { total_miles: { increment: delta } },
+        });
+      }
+    }
   }
 
   revalidateTrainingViews();

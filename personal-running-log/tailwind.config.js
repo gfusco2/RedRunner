@@ -1,4 +1,5 @@
 module.exports = {
+  darkMode: "class",
   content: ["./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
@@ -39,29 +40,24 @@ module.exports = {
           200: "#d9d9de",
           500: "#6b6b76",
           700: "#3a3a42",
+          800: "#222228",
           900: "#141418",
           950: "#0c0c0f",
         },
       },
       fontFamily: {
         sans: [
+          "var(--font-sans)",
           "ui-sans-serif",
           "system-ui",
           "-apple-system",
           "Segoe UI",
-          "Roboto",
-          "Helvetica Neue",
-          "Arial",
           "sans-serif",
         ],
         display: [
+          "var(--font-display)",
           "ui-sans-serif",
           "system-ui",
-          "-apple-system",
-          "Segoe UI",
-          "Roboto",
-          "Helvetica Neue",
-          "Arial",
           "sans-serif",
         ],
       },
