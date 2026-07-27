@@ -18,32 +18,42 @@ export async function getAuthUser() {
 
 /** Ensure a Prisma User row exists for the signed-in Supabase user. */
 export async function ensureProfile(): Promise<User | null> {
-  const authUser = await getAuthUser();
-  if (!authUser?.email) return null;
+  try {
+    const authUser = await getAuthUser();
+    if (!authUser?.email) return null;
 
-  const existing = await prisma.user.findUnique({
-    where: { id: authUser.id },
-  });
-  if (existing) return existing;
+    const existing = await prisma.user.findUnique({
+      where: { id: authUser.id },
+    });
+    if (existing) return existing;
 
-  return prisma.user.create({
-    data: {
-      id: authUser.id,
-      email: authUser.email,
-      name: authUser.user_metadata?.full_name ?? authUser.email.split("@")[0],
-      role: "RUNNER",
-      distanceUnit: "MI",
-    },
-  });
+    return prisma.user.create({
+      data: {
+        id: authUser.id,
+        email: authUser.email,
+        name: authUser.user_metadata?.full_name ?? authUser.email.split("@")[0],
+        role: "RUNNER",
+        distanceUnit: "MI",
+      },
+    });
+  } catch (err) {
+    console.error("ensureProfile failed", err);
+    return null;
+  }
 }
 
 export async function getCurrentProfile(): Promise<User | null> {
-  const authUser = await getAuthUser();
-  if (!authUser) return null;
-  return (
-    (await prisma.user.findUnique({ where: { id: authUser.id } })) ??
-    (await ensureProfile())
-  );
+  try {
+    const authUser = await getAuthUser();
+    if (!authUser) return null;
+    return (
+      (await prisma.user.findUnique({ where: { id: authUser.id } })) ??
+      (await ensureProfile())
+    );
+  } catch (err) {
+    console.error("getCurrentProfile failed", err);
+    return null;
+  }
 }
 
 export async function updateProfile(input: {

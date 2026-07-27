@@ -23,6 +23,7 @@ const display = Bebas_Neue({
 export const metadata: Metadata = {
   title: "RedRunner",
   description: "Plan weeks, log what you ran, see the week clearly.",
+  applicationName: "RedRunner",
 };
 
 /** Runs before paint to avoid a light flash when dark is preferred/stored. */
