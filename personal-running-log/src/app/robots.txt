@@ -1,0 +1,24 @@
+# Public marketing only — keep crawlers off authenticated app routes.
+User-agent: *
+Allow: /
+Allow: /login
+Disallow: /dashboard
+Disallow: /training-log
+Disallow: /settings
+Disallow: /reports
+Disallow: /coach
+Disallow: /auth/
+Disallow: /api/
+
+# Soften aggressive bots that burn Hobby Function Invocations.
+User-agent: GPTBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /

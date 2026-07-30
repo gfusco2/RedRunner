@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { getCurrentProfile, signOut } from "app/actions/auth";
+import { signOut } from "app/actions/auth";
+import { getCurrentProfile } from "lib/auth/profile";
+
+export const maxDuration = 10;
 import { listMyAthletes, listMyCoaches } from "app/actions/coaching";
 import UnitPreferenceForm from "components/settings/UnitPreferenceForm";
 import ProfileForm from "components/settings/ProfileForm";

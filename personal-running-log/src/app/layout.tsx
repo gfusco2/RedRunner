@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { Bebas_Neue, DM_Sans } from "next/font/google";
 import Navbar from "../components/Navbar";
-import { getCurrentProfile } from "app/actions/auth";
+import { getCurrentProfile, hasAuthSessionCookie } from "lib/auth/profile";
 import { PreferencesProvider } from "lib/preferences";
 import type { DistanceUnit } from "lib/training/format";
 import "../styles/globals.css";
@@ -21,16 +21,23 @@ const display = Bebas_Neue({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://redrunner.win"),
   title: "RedRunner",
   description: "Plan weeks, log what you ran, see the week clearly.",
   applicationName: "RedRunner",
 };
 
+/** Bound runaway renders so a stuck request cannot eat Hobby Active CPU. */
+export const maxDuration = 10;
+
 /** Runs before paint to avoid a light flash when dark is preferred/stored. */
 const themeInitScript = `(function(){try{var t=localStorage.getItem('rr_theme');var d=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const profile = await getCurrentProfile();
+  // Guests / bots: skip Supabase + Prisma entirely (huge Hobby-plan savings).
+  const profile = (await hasAuthSessionCookie())
+    ? await getCurrentProfile()
+    : null;
   const initialUnit: DistanceUnit =
     profile?.distanceUnit === "KM" ? "km" : "mi";
 

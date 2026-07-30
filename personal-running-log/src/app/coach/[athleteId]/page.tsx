@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAthleteActivitiesInRange } from "app/actions/activities";
-import { getCurrentProfile } from "app/actions/auth";
+import { getCurrentProfile } from "lib/auth/profile";
+
+export const maxDuration = 10;
 import { listMyAthletes } from "app/actions/coaching";
 import {
   getWeekPlan,
