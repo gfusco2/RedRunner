@@ -25,6 +25,14 @@ export const metadata: Metadata = {
   title: "RedRunner",
   description: "Plan weeks, log what you ran, see the week clearly.",
   applicationName: "RedRunner",
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: {
+      index: false,
+      follow: false,
+    },
+  },
 };
 
 /** Bound runaway renders so a stuck request cannot eat Hobby Active CPU. */

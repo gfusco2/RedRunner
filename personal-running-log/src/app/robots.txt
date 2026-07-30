@@ -1,16 +1,13 @@
-# Public marketing only — keep crawlers off authenticated app routes.
+# Private personal app — do not index or crawl.
 User-agent: *
-Allow: /
-Allow: /login
-Disallow: /dashboard
-Disallow: /training-log
-Disallow: /settings
-Disallow: /reports
-Disallow: /coach
-Disallow: /auth/
-Disallow: /api/
+Disallow: /
 
-# Soften aggressive bots that burn Hobby Function Invocations.
+User-agent: Googlebot
+Disallow: /
+
+User-agent: Bingbot
+Disallow: /
+
 User-agent: GPTBot
 Disallow: /
 
