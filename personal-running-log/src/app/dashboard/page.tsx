@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getActivitiesInRange } from "app/actions/activities";
-import { getCurrentProfile } from "app/actions/auth";
+import { getCurrentProfile } from "lib/auth/profile";
+
+export const maxDuration = 10;
 import {
   getWeekPlan,
   getWeekPlansInRange,

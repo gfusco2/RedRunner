@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ensureProfile } from "app/actions/auth";
+import { ensureProfile } from "lib/auth/profile";
 
 export async function POST() {
   const profile = await ensureProfile();

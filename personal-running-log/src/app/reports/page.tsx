@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { getCurrentProfile } from "app/actions/auth";
+import { getCurrentProfile } from "lib/auth/profile";
+
+export const maxDuration = 10;
 import ReportsClient from "./ReportsClient";
 
 export default async function ReportsPage() {

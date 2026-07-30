@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { User } from "@prisma/client";
-import { ensureProfile, getAuthUser, getCurrentProfile } from "app/actions/auth";
+import { ensureProfile, getAuthUser, getCurrentProfile } from "lib/auth/profile";
 import prisma from "lib/prisma";
 
 async function requireUserId(): Promise<string> {

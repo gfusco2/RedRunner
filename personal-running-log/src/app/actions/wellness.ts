@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { DayWellness } from "@prisma/client";
-import { ensureProfile, getAuthUser } from "app/actions/auth";
+import { ensureProfile, getAuthUser } from "lib/auth/profile";
 import prisma from "lib/prisma";
 import { parseDateKey } from "lib/training/dates";
 

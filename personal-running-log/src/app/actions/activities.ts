@@ -7,7 +7,7 @@ import type {
   Prisma,
   SegmentKind,
 } from "@prisma/client";
-import { ensureProfile, getAuthUser } from "app/actions/auth";
+import { ensureProfile, getAuthUser } from "lib/auth/profile";
 import prisma from "lib/prisma";
 import {
   getPastFourWeekRange,

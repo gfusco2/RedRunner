@@ -1,50 +1,10 @@
 "use server";
 
-import type { DistanceUnit as PrismaDistanceUnit, User } from "@prisma/client";
+import type { DistanceUnit as PrismaDistanceUnit } from "@prisma/client";
 import prisma from "lib/prisma";
+import { ensureProfile } from "lib/auth/profile";
 import { createClient } from "lib/supabase/server";
 import type { DistanceUnit } from "lib/training/format";
-
-export async function getAuthUser() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) return null;
-  return data.user;
-}
-
-/** Ensure a Prisma User row exists for the signed-in Supabase user. */
-export async function ensureProfile(): Promise<User | null> {
-  const authUser = await getAuthUser();
-  if (!authUser?.email) return null;
-
-  const existing = await prisma.user.findUnique({
-    where: { id: authUser.id },
-  });
-  if (existing) return existing;
-
-  return prisma.user.create({
-    data: {
-      id: authUser.id,
-      email: authUser.email,
-      name: authUser.user_metadata?.full_name ?? authUser.email.split("@")[0],
-      role: "RUNNER",
-      distanceUnit: "MI",
-    },
-  });
-}
-
-export async function getCurrentProfile(): Promise<User | null> {
-  const authUser = await getAuthUser();
-  if (!authUser) return null;
-  return (
-    (await prisma.user.findUnique({ where: { id: authUser.id } })) ??
-    (await ensureProfile())
-  );
-}
 
 export async function updateProfile(input: {
   name?: string;

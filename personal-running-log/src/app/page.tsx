@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { getActivitiesInRange } from "app/actions/activities";
-import { getCurrentProfile } from "app/actions/auth";
 import { listMyAthletes } from "app/actions/coaching";
 import { getWeekPlan } from "app/actions/weekPlans";
 import HomeWeekPreview from "components/home/HomeWeekPreview";
+import { getCurrentProfile, hasAuthSessionCookie } from "lib/auth/profile";
 import {
   formatWeekLabel,
   getMonday,
@@ -13,9 +13,15 @@ import {
 import { goalBand } from "lib/training/goals";
 import { totalsForActivities } from "lib/training/totals";
 
-export default async function HomePage() {
-  const profile = await getCurrentProfile();
+/** Bound hobby-plan Active CPU if a request hangs. */
+export const maxDuration = 10;
 
+export default async function HomePage() {
+  if (!(await hasAuthSessionCookie())) {
+    return <GuestHome />;
+  }
+
+  const profile = await getCurrentProfile();
   if (!profile) {
     return <GuestHome />;
   }

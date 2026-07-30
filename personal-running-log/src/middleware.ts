@@ -5,8 +5,18 @@ export async function middleware(request: NextRequest) {
   return updateSession(request);
 }
 
+/**
+ * Only run on app/auth routes that need session refresh.
+ * Skip `/`, `/login`, icons, and static assets so bots and guests
+ * do not burn Function Invocations / Edge Requests.
+ */
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/dashboard/:path*",
+    "/training-log/:path*",
+    "/settings/:path*",
+    "/reports/:path*",
+    "/coach/:path*",
+    "/auth/:path*",
   ],
 };
