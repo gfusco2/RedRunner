@@ -80,7 +80,7 @@ function assertScore(
   value: number | null | undefined,
   required: boolean
 ): number | null {
-  if (value == null || Number.isNaN(Number(value))) {
+  if (value == null || Number.isNaN(Number(value)) || Number(value) === 0) {
     if (required) throw new Error(`${label} is required (1–10).`);
     return null;
   }
@@ -314,6 +314,8 @@ export type SplitInput = {
 export type CompleteActivityInput = {
   difficulty: number;
   feel: number;
+  /** Calendar day YYYY-MM-DD — move the activity to another day. */
+  date?: string;
   /** What you actually did — replaces activity notes. */
   notes?: string | null;
   name?: string | null;
@@ -375,7 +377,7 @@ export async function markActivityCompleted(
 }
 
 /**
- * Edit an owned activity (planned or completed): notes, segments, splits, scores.
+ * Edit an owned activity (planned or completed): date, notes, segments, splits, scores.
  */
 export async function updateActivity(
   id: number,
@@ -423,7 +425,10 @@ async function applyActivityReport(
 
   if (existing.type === "RUN" && input.segments && input.segments.length > 0) {
     segmentRows = buildRunSegments({
-      date: toDateKey(new Date(existing.date)),
+      date:
+        input.date && !Number.isNaN(parseDateKey(input.date).getTime())
+          ? input.date
+          : toDateKey(new Date(existing.date)),
       type: "RUN",
       segments: input.segments,
     });
@@ -477,9 +482,19 @@ async function applyActivityReport(
     }
   }
 
+  let nextDate = existing.date;
+  if (input.date != null && input.date.trim()) {
+    const parsed = parseDateKey(input.date.trim());
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error("Date must be YYYY-MM-DD.");
+    }
+    nextDate = parsed;
+  }
+
   const updated = await prisma.activity.update({
     where: { id },
     data: {
+      date: nextDate,
       planned: opts.complete ? false : existing.planned,
       difficulty: difficulty ?? existing.difficulty,
       feel: feel ?? existing.feel,
