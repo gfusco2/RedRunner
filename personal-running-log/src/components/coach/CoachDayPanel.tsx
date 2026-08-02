@@ -35,6 +35,7 @@ export default function CoachDayPanel({
     weekday: "long",
     month: "long",
     day: "numeric",
+    timeZone: "UTC",
   });
 
   function refresh() {

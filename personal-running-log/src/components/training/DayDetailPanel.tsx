@@ -46,6 +46,7 @@ export default function DayDetailPanel({
     weekday: "long",
     month: "long",
     day: "numeric",
+    timeZone: "UTC",
   });
 
   useEffect(() => {

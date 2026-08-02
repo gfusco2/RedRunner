@@ -29,7 +29,7 @@ export function chartBandsFromPlans(
   const end = parseDateKey(endKeyInclusive);
   const bands: ChartGoalBand[] = [];
 
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+  for (let d = new Date(start.getTime()); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
     const dateKey = toDateKey(d);
     const weekKey = toDateKey(getMonday(d));
     const plan = byWeek[weekKey];
