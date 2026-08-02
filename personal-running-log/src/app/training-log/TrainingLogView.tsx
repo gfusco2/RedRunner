@@ -17,6 +17,7 @@ import {
   toDateKey,
   getMonday,
   getPastFourWeekRange,
+  localTodayKey,
 } from "lib/training/dates";
 import { goalBand } from "lib/training/goals";
 import {
@@ -42,8 +43,8 @@ export default function TrainingLogView({
   const weekStart = parseDateKey(weekStartKey);
   const prevWeekKey = toDateKey(addWeeks(weekStart, -1));
   const nextWeekKey = toDateKey(addWeeks(weekStart, 1));
-  const currentWeekKey = toDateKey(getMonday(new Date()));
-  const todayKey = toDateKey(new Date());
+  const currentWeekKey = toDateKey(getMonday(parseDateKey(localTodayKey())));
+  const todayKey = localTodayKey();
 
   const weekStarts = getFourWeekStarts(weekStart);
   const { start: rangeStart, end: rangeEnd } = getPastFourWeekRange(weekStart);
@@ -54,7 +55,7 @@ export default function TrainingLogView({
     const { weekDays, weekTotals } = buildWeekCalendarData(
       days,
       activities,
-      new Date()
+      parseDateKey(todayKey)
     );
     const plan = plansByWeek[weekKey];
     return {

@@ -14,6 +14,7 @@ import {
   parseMinSec,
 } from "lib/training/format";
 import { usePreferences } from "lib/preferences";
+import { toDateKey } from "lib/training/dates";
 import { SEGMENT_KIND_SHORT } from "lib/training/tags";
 
 type Props = {
@@ -84,6 +85,7 @@ export default function CompleteWorkoutForm({
   const isEdit = mode === "edit";
 
   const [name, setName] = useState(activity.name ?? "");
+  const [dateKey, setDateKey] = useState(toDateKey(new Date(activity.date)));
   const [notes, setNotes] = useState(activity.notes ?? "");
   const [includeWu, setIncludeWu] = useState(Boolean(wu));
   const [includeCd, setIncludeCd] = useState(Boolean(cd));
@@ -236,6 +238,7 @@ export default function CompleteWorkoutForm({
         const payload = {
           difficulty,
           feel,
+          date: dateKey,
           name: name.trim() || null,
           notes: notes.trim() || null,
           segments,
@@ -268,9 +271,25 @@ export default function CompleteWorkoutForm({
         </p>
         <p className="mt-0.5 text-[11px] text-brand-700">
           {isEdit
-            ? "Update distances, notes, splits, and how it felt."
+            ? "Change the day, distances, notes, splits, and how it felt."
             : "The plan is a guide — adjust distances, add notes, and record splits."}
         </p>
+      </div>
+
+      <div>
+        <label className="label-field">Date</label>
+        <input
+          type="date"
+          required
+          className="input-field"
+          value={dateKey}
+          onChange={(e) => setDateKey(e.target.value)}
+        />
+        {dateKey !== toDateKey(new Date(activity.date)) && (
+          <p className="mt-1 text-[11px] text-ink-500">
+            Saving will move this workout to that day.
+          </p>
+        )}
       </div>
 
       {!isEdit && activity.segments.length > 0 && (

@@ -46,6 +46,7 @@ export default function DayDetailPanel({
     weekday: "long",
     month: "long",
     day: "numeric",
+    timeZone: "UTC",
   });
 
   useEffect(() => {
@@ -261,14 +262,24 @@ export default function DayDetailPanel({
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-1.5">
                           {activity.planned && !formOpen && (
-                            <button
-                              type="button"
-                              disabled={pending}
-                              onClick={() => openForm(activity.id, "complete")}
-                              className="text-xs font-semibold text-brand-600 hover:text-brand-800 disabled:opacity-50"
-                            >
-                              Mark done
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                disabled={pending}
+                                onClick={() => openForm(activity.id, "complete")}
+                                className="text-xs font-semibold text-brand-600 hover:text-brand-800 disabled:opacity-50"
+                              >
+                                Mark done
+                              </button>
+                              <button
+                                type="button"
+                                disabled={pending}
+                                onClick={() => openForm(activity.id, "edit")}
+                                className="text-xs font-semibold text-ink-600 hover:text-brand-800 disabled:opacity-50"
+                              >
+                                Edit
+                              </button>
+                            </>
                           )}
                           {!activity.planned && !formOpen && (
                             <button

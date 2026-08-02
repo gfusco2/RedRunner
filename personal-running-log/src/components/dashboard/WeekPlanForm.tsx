@@ -9,6 +9,7 @@ import {
   getMonday,
   parseDateKey,
   toDateKey,
+  localTodayKey,
 } from "lib/training/dates";
 import WeekGoalEditor from "./WeekGoalEditor";
 
@@ -24,7 +25,7 @@ export default function WeekPlanForm({
   plansByWeek,
   athleteId,
 }: Props) {
-  const currentWeekKey = toDateKey(getMonday(new Date()));
+  const currentWeekKey = toDateKey(getMonday(parseDateKey(localTodayKey())));
   const [selectedKey, setSelectedKey] = useState(baseWeekStartKey);
   const [plan, setPlan] = useState<WeekPlan | null>(
     plansByWeek[baseWeekStartKey] ?? null

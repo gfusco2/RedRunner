@@ -49,12 +49,12 @@ export function buildRolling7DaySeries(
   const end = parseDateKey(endKeyInclusive);
   const points: RollingPoint[] = [];
 
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+  for (let d = new Date(start.getTime()); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
     const dateKey = toDateKey(d);
     let miles = 0;
     for (let i = 0; i < 7; i++) {
-      const day = new Date(d);
-      day.setDate(day.getDate() - i);
+      const day = new Date(d.getTime());
+      day.setUTCDate(day.getUTCDate() - i);
       miles += daily[toDateKey(day)] ?? 0;
     }
     points.push({ dateKey, miles });

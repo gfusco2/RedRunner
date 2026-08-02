@@ -10,12 +10,13 @@ import {
 } from "lib/training/format";
 import { usePreferences } from "lib/preferences";
 import { TAG_LABELS } from "lib/training/tags";
-import { toDateKey, parseDateKey, addWeeks, getMonday } from "lib/training/dates";
+import { toDateKey, parseDateKey, addWeeks, getMonday, localTodayKey } from "lib/training/dates";
 
 function defaultRange() {
-  const end = new Date();
+  const todayKey = localTodayKey();
+  const end = parseDateKey(todayKey);
   const start = addWeeks(getMonday(end), -3);
-  return { start: toDateKey(start), end: toDateKey(end) };
+  return { start: toDateKey(start), end: todayKey };
 }
 
 export default function ReportsClient() {
